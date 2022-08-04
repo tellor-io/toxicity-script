@@ -13,37 +13,42 @@ require("isomorphic-unfetch");
 const API_URL = "https://api.thegraph.com/subgraphs/name/tkernell/hundred-finance-polygon"
 const query = `
     query {
-        transfers(first: 5) {
+        transfers(first: 500) {
             id
             contract
             to
         } 	
     }
 `
-
 const client = createClient({ url: API_URL });
 
 // hToken addresses
-var tellorAddress = "0xFd45Ae72E81Adaaf01cC61c8bCe016b7060DD537";
-var cEtherAddress = "0xEbd7f3349AbA8bB15b897e03D6c1a4Ba95B55e31";
-
+const ethTokenAddress = "0x243E33aa7f6787154a8E59d3C27a66db3F8818ee";
+const daiTokenAddress = "0xE4e43864ea18d5E5211352a4B810383460aB7fcC";
+const usdcTokenAddress = "0x607312a5C671D0C511998171e634DE32156e69d0";
+const usdtTokenAddress = "0x103f2CA2148B863942397dbc50a425cc4f4E9A27";
+const fraxTokenAddress = "0x103f2CA2148B863942397dbc50a425cc4f4E9A27";
+const wbtcTokenAddress = "0xb4300e088a3AE4e624EE5C71Bc1822F68BB5f2bc";
+const maticTokenAddress = "0xEbd7f3349AbA8bB15b897e03D6c1a4Ba95B55e31";
+const linkTokenAddress = "0x5B9451B1bFAE2A74D7b9D0D45BdD0E9a27F7bB22";
+let ethUserAddresses = []
+let daiUserAddresses = []
+let usdcUserAddresses = []
+let usdtUserAddresses = []
+let fraxUserAddresses = []
+let wbtcUserAddresses = []
+let maticUserAddresses = []
+let linkUserAddresses = []
 
 async function main(_nodeURL) {
 
-    // setup all tokens - will connect to already deployed tokens in production
-    const Token = await ethers.getContractFactory("ERC20")
-    const token1 = await Token.deploy("Test Token 1", "TEST1")
-    await token1.deployed()
-    const token2 = await Token.deploy("Test Token 2", "TEST2")
-    await token2.deployed()
-    const token3 = await Token.deploy("Test Token 3", "TEST3")
-    await token3.deployed()
     const accounts = await ethers.getSigners()
 
-    // let privateKey = process.env.TESTNET_PK
-    // let provider = new ethers.providers.JsonRpcProvider(_nodeURL)
-    // let wallet = new ethers.Wallet(privateKey, provider)
-    // let cEther = await ethers.getContractAt("ERC20", cEtherAddress)
+    let privateKey = process.env.TESTNET_PK
+    let provider = new ethers.providers.JsonRpcProvider(_nodeURL)
+    let wallet = new ethers.Wallet(privateKey, provider)
+    let hEther = await ethers.getContractAt("ERC20", ethTokenAddress, wallet)
+    let hDai = await ethers.getContractAt("ERC20", daiTokenAddress, wallet)
     // cEther = await cEther.connect(wallet)
 
     // let filterAllTransfers = cEther.filters.Transfer(null)
@@ -56,14 +61,22 @@ async function main(_nodeURL) {
     // addressesWithBalance = uniq(addressesWithBalance)
     // console.log("addressesWithBalance:", addressesWithBalance)
 
+    // get all transfer events from the graph
+    tx = await fetchData()
 
-    await fetchData()
-    // await setupToken()
+    // separate the addresses into different arrays based on token
+    parseTransfers(tx)
+
+
+
+
 }
 
 async function fetchData() {
     const response = await client.query(query).toPromise()
-    console.log("response:", response)
+    // console.log("response:", response)
+    // console.log("length: " + response.data.transfers.length)
+    return response.data.transfers
 }
 
 async function setupToken() {
@@ -98,6 +111,55 @@ async function setupToken() {
     }
     // console.log("events:", events)
 }
+
+function parseTransfers(tx) {
+
+    for(let i=0; i<tx.length; i++) {
+        if(tx[i].contract == ethTokenAddress) {
+            if(tx[i].to != ethTokenAddress) {
+                ethUserAddresses.push(tx[i].to)
+            }
+        } else if(tx[i].contract == daiTokenAddress) {
+            if(tx[i].to != daiTokenAddress) {
+                daiUserAddresses.push(tx[i].to)
+            }
+        } else if(tx[i].contract == usdcTokenAddress) {
+            if(tx[i].to != usdcTokenAddress) {
+                usdcUserAddresses.push(tx[i].to)
+            }
+        } else if(tx[i].contract == usdtTokenAddress) {
+            if(tx[i].to != usdtTokenAddress) {
+                usdtUserAddresses.push(tx[i].to)
+            }
+        } else if(tx[i].contract == fraxTokenAddress) {
+            if(tx[i].to != fraxTokenAddress) {
+                fraxUserAddresses.push(tx[i].to)
+            }
+        } else if(tx[i].contract == wbtcTokenAddress) {
+            if(tx[i].to != wbtcTokenAddress) {
+                wbtcUserAddresses.push(tx[i].to)
+            }
+        } else if(tx[i].contract == maticTokenAddress) {
+            if(tx[i].to != maticTokenAddress) {
+                maticUserAddresses.push(tx[i].to)
+            }
+        } else if(tx[i].contract == linkTokenAddress) {
+            if(tx[i].to != linkTokenAddress) {
+                linkUserAddresses.push(tx[i].to)
+            }
+        } 
+    }
+    ethUserAddresses = uniq(ethUserAddresses)
+    daiUserAddresses = uniq(daiUserAddresses)
+    usdcUserAddresses = uniq(usdcUserAddresses)
+    usdtUserAddresses = uniq(usdtUserAddresses)
+    fraxUserAddresses = uniq(fraxUserAddresses)
+    wbtcUserAddresses = uniq(wbtcUserAddresses)
+    maticUserAddresses = uniq(maticUserAddresses)
+    linkUserAddresses = uniq(linkUserAddresses)
+}
+
+
 
 function uniq(a) {
     var prims = {"boolean":{}, "number":{}, "string":{}}, objs = [];
