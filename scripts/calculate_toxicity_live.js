@@ -1,14 +1,9 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// You can also run a script with `npx hardhat run <script>`. If you do that, Hardhat
-// will compile your contracts, add the Hardhat Runtime Environment's members to the
-// global scope, and execute the script.
 const { ethers } = require("hardhat");
 require("dotenv").config();
 const web3 = require('web3');
 const { Contract, Provider } = require('ethers-multicall')
 const createClient = require("urql").createClient;
+const axios = require('axios');
 require("isomorphic-unfetch");
 var fs = require('fs');
 var erc20jsonFile = "./artifacts/contracts/ERC20.sol/ERC20.json"
@@ -16,27 +11,30 @@ var erc20Parsed = JSON.parse(fs.readFileSync(erc20jsonFile));
 var erc20Abi = erc20Parsed.abi
 
 const API_URL = "https://api.thegraph.com/subgraphs/name/tkernell/hundred-finance-polygon"
-const query = `
-    query {
-        transfers(first: 1000) {
-            id
-            contract
-            to
-        } 	
-    }
-`
 const client = createClient({ url: API_URL });
 const provider = new ethers.providers.JsonRpcProvider(process.env.NODE_URL_POLYGON)
 
+const ONE_INCH_URL = "https://api.1inch.io/v4.0/137/quote?"
+
 // hToken addresses
-const ethTokenAddress = "0x243E33aa7f6787154a8E59d3C27a66db3F8818ee";
-const daiTokenAddress = "0xE4e43864ea18d5E5211352a4B810383460aB7fcC";
-const usdcTokenAddress = "0x607312a5C671D0C511998171e634DE32156e69d0";
-const usdtTokenAddress = "0x103f2CA2148B863942397dbc50a425cc4f4E9A27";
-const fraxTokenAddress = "0x2c7a9d9919f042C4C120199c69e126124d09BE7c";
-const wbtcTokenAddress = "0xb4300e088a3AE4e624EE5C71Bc1822F68BB5f2bc";
-const maticTokenAddress = "0xEbd7f3349AbA8bB15b897e03D6c1a4Ba95B55e31";
-const linkTokenAddress = "0x5B9451B1bFAE2A74D7b9D0D45BdD0E9a27F7bB22";
+const hEthTokenAddress = "0x243E33aa7f6787154a8E59d3C27a66db3F8818ee";
+const hDaiTokenAddress = "0xE4e43864ea18d5E5211352a4B810383460aB7fcC";
+const hUsdcTokenAddress = "0x607312a5C671D0C511998171e634DE32156e69d0";
+const hUsdtTokenAddress = "0x103f2CA2148B863942397dbc50a425cc4f4E9A27";
+const hFraxTokenAddress = "0x2c7a9d9919f042C4C120199c69e126124d09BE7c";
+const hWbtcTokenAddress = "0xb4300e088a3AE4e624EE5C71Bc1822F68BB5f2bc";
+const hMaticTokenAddress = "0xEbd7f3349AbA8bB15b897e03D6c1a4Ba95B55e31";
+const hLinkTokenAddress = "0x5B9451B1bFAE2A74D7b9D0D45BdD0E9a27F7bB22";
+
+// underlying token addresss
+const ethTokenAddress = "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619";
+const daiTokenAddress = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";
+const usdcTokenAddress = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
+const usdtTokenAddress = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F";
+const fraxTokenAddress = "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89";
+const wbtcTokenAddress = "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6";
+const maticTokenAddress = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // wrapped matic
+const linkTokenAddress = "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39";
 
 let ethUserAddresses = []
 let daiUserAddresses = []
@@ -116,19 +114,6 @@ async function main(_nodeURL) {
     let privateKey = process.env.TESTNET_PK
     // let provider = new ethers.providers.JsonRpcProvider(_nodeURL)
     let wallet = new ethers.Wallet(privateKey, provider)
-    let hEther = await ethers.getContractAt("ERC20", ethTokenAddress, wallet)
-    let hDai = await ethers.getContractAt("ERC20", daiTokenAddress, wallet)
-    // cEther = await cEther.connect(wallet)
-
-    // let filterAllTransfers = cEther.filters.Transfer(null)
-    // let events = await cEther.queryFilter(filterAllTransfers, 0, "latest")
-
-    // let addressesWithBalance = []
-    // for(i = 0; i < events.length; i++) {
-    //     addressesWithBalance.push(events[i].args.to)
-    // }
-    // addressesWithBalance = uniq(addressesWithBalance)
-    // console.log("addressesWithBalance:", addressesWithBalance)
 
     // get all transfer events from the graph
     tx = await fetchData()
@@ -139,14 +124,21 @@ async function main(_nodeURL) {
     // get the balance of each address
     await getSnapshots()
 
-
+    await getCollateralAndDebt()
 }
 
+
+
 async function fetchData() {
-    const response = await client.query(query).toPromise()
-    // console.log("response:", response)
-    // console.log("length: " + response.data.transfers.length)
-    return response.data.transfers
+    let response = await client.query(query('')).toPromise()
+    let responseAll = []
+
+    while(response.data.transfers.length > 0) {
+        responseAll = responseAll.concat(response.data.transfers);
+        lastID = response.data.transfers[response.data.transfers.length - 1].id
+        response = await client.query(query(lastID)).toPromise()
+    }
+    return responseAll
 }
 
 async function setupToken() {
@@ -185,36 +177,36 @@ async function setupToken() {
 function parseTransfers(tx) {
 
     for(let i=0; i<tx.length; i++) {
-        if(tx[i].contract == ethTokenAddress) {
-            if(tx[i].to != ethTokenAddress) {
+        if(tx[i].contract == hEthTokenAddress) {
+            if(tx[i].to != hEthTokenAddress) {
                 ethUserAddresses.push(tx[i].to)
             }
-        } else if(tx[i].contract == daiTokenAddress) {
-            if(tx[i].to != daiTokenAddress) {
+        } else if(tx[i].contract == hDaiTokenAddress) {
+            if(tx[i].to != hDaiTokenAddress) {
                 daiUserAddresses.push(tx[i].to)
             }
-        } else if(tx[i].contract == usdcTokenAddress) {
-            if(tx[i].to != usdcTokenAddress) {
+        } else if(tx[i].contract == hUsdcTokenAddress) {
+            if(tx[i].to != hUsdcTokenAddress) {
                 usdcUserAddresses.push(tx[i].to)
             }
-        } else if(tx[i].contract == usdtTokenAddress) {
-            if(tx[i].to != usdtTokenAddress) {
+        } else if(tx[i].contract == hUsdtTokenAddress) {
+            if(tx[i].to != hUsdtTokenAddress) {
                 usdtUserAddresses.push(tx[i].to)
             }
-        } else if(tx[i].contract == fraxTokenAddress) {
-            if(tx[i].to != fraxTokenAddress) {
+        } else if(tx[i].contract == hFraxTokenAddress) {
+            if(tx[i].to != hFraxTokenAddress) {
                 fraxUserAddresses.push(tx[i].to)
             }
-        } else if(tx[i].contract == wbtcTokenAddress) {
-            if(tx[i].to != wbtcTokenAddress) {
+        } else if(tx[i].contract == hWbtcTokenAddress) {
+            if(tx[i].to != hWbtcTokenAddress) {
                 wbtcUserAddresses.push(tx[i].to)
             }
-        } else if(tx[i].contract == maticTokenAddress) {
-            if(tx[i].to != maticTokenAddress) {
+        } else if(tx[i].contract == hMaticTokenAddress) {
+            if(tx[i].to != hMaticTokenAddress) {
                 maticUserAddresses.push(tx[i].to)
             }
-        } else if(tx[i].contract == linkTokenAddress) {
-            if(tx[i].to != linkTokenAddress) {
+        } else if(tx[i].contract == hLinkTokenAddress) {
+            if(tx[i].to != hLinkTokenAddress) {
                 console.log("link " + i + ": " + tx[i].to)
                 linkUserAddresses.push(tx[i].to)
             }
@@ -233,16 +225,16 @@ function parseTransfers(tx) {
 async function getSnapshots() {
     const callProvider = new Provider(provider)
     await callProvider.init()
-    const ERC20 = ethers.getContractAt("ERC20", ethTokenAddress)
+    const ERC20 = ethers.getContractAt("ERC20", hEthTokenAddress)
 
-    const ethContract = new Contract(ethTokenAddress, erc20Abi)
-    const daiContract = new Contract(daiTokenAddress, erc20Abi)
-    const usdcContract = new Contract(usdcTokenAddress, erc20Abi)
-    const usdtContract = new Contract(usdtTokenAddress, erc20Abi)
-    const fraxContract = new Contract(fraxTokenAddress, erc20Abi)
-    const wbtcContract = new Contract(wbtcTokenAddress, erc20Abi)
-    const maticContract = new Contract(maticTokenAddress, erc20Abi)
-    const linkContract = new Contract(linkTokenAddress, erc20Abi)
+    const ethContract = new Contract(hEthTokenAddress, erc20Abi)
+    const daiContract = new Contract(hDaiTokenAddress, erc20Abi)
+    const usdcContract = new Contract(hUsdcTokenAddress, erc20Abi)
+    const usdtContract = new Contract(hUsdtTokenAddress, erc20Abi)
+    const fraxContract = new Contract(hFraxTokenAddress, erc20Abi)
+    const wbtcContract = new Contract(hWbtcTokenAddress, erc20Abi)
+    const maticContract = new Contract(hMaticTokenAddress, erc20Abi)
+    const linkContract = new Contract(hLinkTokenAddress, erc20Abi)
 
     const ethContractCalls = ethUserAddresses.map(ethUserAddresses => ethContract.getAccountSnapshot(ethUserAddresses))
     const daiContractCalls = daiUserAddresses.map(daiUserAddresses => daiContract.getAccountSnapshot(daiUserAddresses))
@@ -263,12 +255,12 @@ async function getSnapshots() {
     linkSnapshot = await callProvider.all(linkContractCalls)
 }
 
-function getCollateralAndDebt() {
+async function getCollateralAndDebt() {
     // eth
     for(i = 0; i < ethUserAddresses.length; i++) {
         if(ethSnapshot[i][1] > 0 || ethSnapshot[i][2] > 0) {
-            collateralUsd = ethSnapshot[i][1] * ethPrice
-            debtUsd = ethSnapshot[i][2] * ethPrice
+            collateralUsd = web3.utils.fromWei(ethSnapshot[i][1].toString()) * ethPrice
+            debtUsd = web3.utils.fromWei(ethSnapshot[i][2].toString()) * ethPrice
             ethCollateral.push({address: ethUserAddresses[i], eth: collateralUsd})
             ethDebt.push({address: ethUserAddresses[i], eth: debtUsd})
         }
@@ -276,62 +268,68 @@ function getCollateralAndDebt() {
     // dai
     for(i = 0; i < daiUserAddresses.length; i++) {
         if(daiSnapshot[i][1] > 0 || daiSnapshot[i][2] > 0) {
-            collateralUsd = daiSnapshot[i][1] * daiPrice
-            debtUsd = daiSnapshot[i][2] * daiPrice
+            collateralUsd = web3.utils.fromWei(daiSnapshot[i][1].toString()) * daiPrice
+            debtUsd = web3.utils.fromWei(daiSnapshot[i][2].toString()) * daiPrice
             daiCollateral.push({address: daiUserAddresses[i], dai: collateralUsd})
             daiDebt.push({address: daiUserAddresses[i], dai: debtUsd})
         }
     }
+
     // usdc
     for(i = 0; i < usdcUserAddresses.length; i++) {
         if(usdcSnapshot[i][1] > 0 || usdcSnapshot[i][2] > 0) {
-            collateralUsd = usdcSnapshot[i][1] * usdcPrice
-            debtUsd = usdcSnapshot[i][2] * usdcPrice
+            collateralUsd = web3.utils.fromWei(usdcSnapshot[i][1].toString()) * usdcPrice
+            debtUsd = web3.utils.fromWei(usdcSnapshot[i][2].toString()) * usdcPrice
             usdcCollateral.push({address: usdcUserAddresses[i], usdc: collateralUsd})
             usdcDebt.push({address: usdcUserAddresses[i], usdc: debtUsd})
         }
     }
+
     // usdt
     for(i = 0; i < usdtUserAddresses.length; i++) {
         if(usdtSnapshot[i][1] > 0 || usdtSnapshot[i][2] > 0) {
-            collateralUsd = usdtSnapshot[i][1] * usdtPrice
-            debtUsd = usdtSnapshot[i][2] * usdtPrice
+            collateralUsd = web3.utils.fromWei(usdtSnapshot[i][1].toString()) * usdtPrice
+            debtUsd = web3.utils.fromWei(usdtSnapshot[i][2].toString()) * usdtPrice
             usdtCollateral.push({address: usdtUserAddresses[i], usdt: collateralUsd})
             usdtDebt.push({address: usdtUserAddresses[i], usdt: debtUsd})
         }
     }
+
     // frax
     for(i = 0; i < fraxUserAddresses.length; i++) {
         if(fraxSnapshot[i][1] > 0 || fraxSnapshot[i][2] > 0) {
-            collateralUsd = fraxSnapshot[i][1] * fraxPrice
-            debtUsd = fraxSnapshot[i][2] * fraxPrice
+            collateralUsd = web3.utils.fromWei(fraxSnapshot[i][1].toString()) * fraxPrice
+            debtUsd = web3.utils.fromWei(fraxSnapshot[i][2].toString()) * fraxPrice
             fraxCollateral.push({address: fraxUserAddresses[i], frax: collateralUsd})
             fraxDebt.push({address: fraxUserAddresses[i], frax: debtUsd})
         }
     }
+
     // wbtc
     for(i = 0; i < wbtcUserAddresses.length; i++) {
         if(wbtcSnapshot[i][1] > 0 || wbtcSnapshot[i][2] > 0) {
-            collateralUsd = wbtcSnapshot[i][1] * wbtcPrice
-            debtUsd = wbtcSnapshot[i][2] * wbtcPrice
+            collateralUsd = web3.utils.fromWei(wbtcSnapshot[i][1].toString()) * wbtcPrice
+            debtUsd = web3.utils.fromWei(wbtcSnapshot[i][2].toString()) * wbtcPrice
             wbtcCollateral.push({address: wbtcUserAddresses[i], wbtc: collateralUsd})
             wbtcDebt.push({address: wbtcUserAddresses[i], wbtc: debtUsd})
         }
     }
+
     // matic
     for(i = 0; i < maticUserAddresses.length; i++) {
         if(maticSnapshot[i][1] > 0 || maticSnapshot[i][2] > 0) {
-            collateralUsd = maticSnapshot[i][1] * maticPrice
-            debtUsd = maticSnapshot[i][2] * maticPrice
+            collateralUsd = web3.utils.fromWei(maticSnapshot[i][1].toString()) * maticPrice
+            debtUsd = web3.utils.fromWei(maticSnapshot[i][2].toString()) * maticPrice
             maticCollateral.push({address: maticUserAddresses[i], matic: collateralUsd})
             maticDebt.push({address: maticUserAddresses[i], matic: debtUsd})
         }
     }
+
     // link
     for(i = 0; i < linkUserAddresses.length; i++) {
         if(linkSnapshot[i][1] > 0 || linkSnapshot[i][2] > 0) {
-            collateralUsd = linkSnapshot[i][1] * linkPrice
-            debtUsd = linkSnapshot[i][2] * linkPrice
+            collateralUsd = web3.utils.fromWei(linkSnapshot[i][1].toString()) * linkPrice
+            debtUsd = web3.utils.fromWei(linkSnapshot[i][2].toString()) * linkPrice
             linkCollateral.push({address: linkUserAddresses[i], link: collateralUsd})
             linkDebt.push({address: linkUserAddresses[i], link: debtUsd})
         }
@@ -352,6 +350,62 @@ function getCollateralAndDebt() {
     debt = mergeByAddress(debt, maticDebt)
     debt = mergeByAddress(debt, linkDebt)
 
+    // convert all NaN to 0
+    for(i = 0; i < collateral.length; i++) {
+        if(isNaN(collateral[i].eth)) {
+            collateral[i].eth = 0
+        }
+        if(isNaN(collateral[i].dai)) {
+            collateral[i].dai = 0
+        }
+        if(isNaN(collateral[i].usdc)) {
+            collateral[i].usdc = 0
+        }
+        if(isNaN(collateral[i].usdt)) {
+            collateral[i].usdt = 0
+        }
+        if(isNaN(collateral[i].frax)) {
+            collateral[i].frax = 0
+        }
+        if(isNaN(collateral[i].wbtc)) {
+            collateral[i].wbtc = 0
+        }
+        if(isNaN(collateral[i].matic)) {
+            collateral[i].matic = 0
+        }
+        if(isNaN(collateral[i].link)) {
+            collateral[i].link = 0
+        }
+
+        if(isNaN(debt[i].eth)) {
+            debt[i].eth = 0
+        }
+        if(isNaN(debt[i].dai)) {
+            debt[i].dai = 0
+        }
+        if(isNaN(debt[i].usdc)) {
+            debt[i].usdc = 0
+        }
+        if(isNaN(debt[i].usdt)) {
+            debt[i].usdt = 0
+        }
+        if(isNaN(debt[i].frax)) {
+            debt[i].frax = 0
+        }
+        if(isNaN(debt[i].wbtc)) {
+            debt[i].wbtc = 0
+        }
+        if(isNaN(debt[i].matic)) {
+            debt[i].matic = 0
+        }
+        if(isNaN(debt[i].link)) {
+            debt[i].link = 0
+        }
+    }
+
+    console.log("collateral: ", collateral)
+    console.log("debt: ", debt)
+
     // get L^qP -- total $-value of assets owed by user q on platform P
     for(i = 0; i < debt.length; i++) {
         debt[i].L = debt[i].eth + debt[i].dai + debt[i].usdc + debt[i].usdt + debt[i].frax + debt[i].wbtc + debt[i].matic + debt[i].link
@@ -371,7 +425,11 @@ function getCollateralAndDebt() {
 
         rShare.push({address: collateral[i].address, eth: rEth, dai: rDai, usdc: rUsdc, usdt: rUsdt, frax: rFrax, wbtc: rWbtc, matic: rMatic, link: rLink})
     }
-
+    console.log("rShare:")
+    console.log(rShare)
+    console.log("ethLtv: " + ethLtv)
+    console.log("debt: " + debt[1].eth)
+    console.log("collateral: " + collateral[1].eth)
     LByAsset = {eth: 0, dai: 0, usdc: 0, usdt: 0, frax: 0, wbtc: 0, matic: 0, link: 0}
     for(i = 0; i<collateral.length; i++) {
         LByAsset.eth += rShare[i].eth * debt[i].eth
@@ -383,28 +441,37 @@ function getCollateralAndDebt() {
         LByAsset.matic += rShare[i].matic * debt[i].matic
         LByAsset.link += rShare[i].link * debt[i].link
     }
-
+    console.log("LByAsset.eth: " + LByAsset.eth)
+    console.log("LByAsset.dai: " + LByAsset.dai)
+    console.log("LByAsset.usdc: " + LByAsset.usdc)
+    console.log("LByAsset.usdt: " + LByAsset.usdt)
+    console.log("LByAsset.frax: " + LByAsset.frax)
+    console.log("LByAsset.wbtc: " + LByAsset.wbtc)
+    console.log("LByAsset.matic: " + LByAsset.matic)
+    console.log("LByAsset.link: " + LByAsset.link)
+    console.log("collateralLength: " + collateral.length)
+    console.log("debtLength: " + debt.length)
     // get inc loan weighted average
     incLoanWeightedAvg = {eth: 0, dai: 0, usdc: 0, usdt: 0, frax: 0, wbtc: 0, matic: 0, link: 0}
-    incLoanWeightedAvg.eth = ethInc * LByAsset.eth / LbyAsset.eth
-    incLoanWeightedAvg.dai = daiInc * LByAsset.dai / LbyAsset.dai
-    incLoanWeightedAvg.usdc = usdcInc * LByAsset.usdc / LbyAsset.usdc
-    incLoanWeightedAvg.usdt = usdtInc * LByAsset.usdt / LbyAsset.usdt
-    incLoanWeightedAvg.frax = fraxInc * LByAsset.frax / LbyAsset.frax
-    incLoanWeightedAvg.wbtc = wbtcInc * LByAsset.wbtc / LbyAsset.wbtc
-    incLoanWeightedAvg.matic = maticInc * LByAsset.matic / LbyAsset.matic
-    incLoanWeightedAvg.link = linkInc * LByAsset.link / LbyAsset.link
+    incLoanWeightedAvg.eth = ethInc * LByAsset.eth / LByAsset.eth
+    incLoanWeightedAvg.dai = daiInc * LByAsset.dai / LByAsset.dai
+    incLoanWeightedAvg.usdc = usdcInc * LByAsset.usdc / LByAsset.usdc
+    incLoanWeightedAvg.usdt = usdtInc * LByAsset.usdt / LByAsset.usdt
+    incLoanWeightedAvg.frax = fraxInc * LByAsset.frax / LByAsset.frax
+    incLoanWeightedAvg.wbtc = wbtcInc * LByAsset.wbtc / LByAsset.wbtc
+    incLoanWeightedAvg.matic = maticInc * LByAsset.matic / LByAsset.matic
+    incLoanWeightedAvg.link = linkInc * LByAsset.link / LByAsset.link
 
     // get LTV loan weighted average
     ltvLoanWeightedAvg = {eth: 0, dai: 0, usdc: 0, usdt: 0, frax: 0, wbtc: 0, matic: 0, link: 0}
-    ltvLoanWeightedAvg.eth = ethLtv * LByAsset.eth / LbyAsset.eth
-    ltvLoanWeightedAvg.dai = daiLtv * LByAsset.dai / LbyAsset.dai
-    ltvLoanWeightedAvg.usdc = usdcLtv * LByAsset.usdc / LbyAsset.usdc
-    ltvLoanWeightedAvg.usdt = usdtLtv * LByAsset.usdt / LbyAsset.usdt
-    ltvLoanWeightedAvg.frax = fraxLtv * LByAsset.frax / LbyAsset.frax
-    ltvLoanWeightedAvg.wbtc = wbtcLtv * LByAsset.wbtc / LbyAsset.wbtc
-    ltvLoanWeightedAvg.matic = maticLtv * LByAsset.matic / LbyAsset.matic
-    ltvLoanWeightedAvg.link = linkLtv * LByAsset.link / LbyAsset.link
+    ltvLoanWeightedAvg.eth = ethLtv * LByAsset.eth / LByAsset.eth
+    ltvLoanWeightedAvg.dai = daiLtv * LByAsset.dai / LByAsset.dai
+    ltvLoanWeightedAvg.usdc = usdcLtv * LByAsset.usdc / LByAsset.usdc
+    ltvLoanWeightedAvg.usdt = usdtLtv * LByAsset.usdt / LByAsset.usdt
+    ltvLoanWeightedAvg.frax = fraxLtv * LByAsset.frax / LByAsset.frax
+    ltvLoanWeightedAvg.wbtc = wbtcLtv * LByAsset.wbtc / LByAsset.wbtc
+    ltvLoanWeightedAvg.matic = maticLtv * LByAsset.matic / LByAsset.matic
+    ltvLoanWeightedAvg.link = linkLtv * LByAsset.link / LByAsset.link
 
     // get c_(i,j) total $-value of asset i collateralizing asset j loans 
     cTotal.ethCollateral = ({eth: 0, dai: 0, usdc: 0, usdt: 0, frax: 0, wbtc: 0, matic: 0, link: 0})
@@ -424,13 +491,51 @@ function getCollateralAndDebt() {
             }
         }
     }
+
+    // get liquidity
+    amount = web3.utils.toWei("1")
+    let ethS = (incLoanWeightedAvg.eth + ltvLoanWeightedAvg.eth) * web3.utils.fromWei(amount) * ethPrice
+    // https://api.1inch.io/v4.0/137/quote?fromTokenAddress=0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE&toTokenAddress=0x111111111117dc0aa78b770fa6a738034120c302&amount=10000000000000000
+    axios
+        .get(ONE_INCH_URL + "fromTokenAddress=" + ethTokenAddress + "&toTokenAddress=" + maticTokenAddress + "&amount=" + amount)
+        .then(res => {
+            console.log(res.data.toTokenAmount);
+        })
+        .catch(err => {
+            console.log(err);
+        });
         
+    amountIn = web3.utils.toWei("1")
+    amountOut = null
+    // let colIn1 = (incLoanWeightedAvg.eth + ltvLoanWeightedAvg.eth) * web3.utils.fromWei(amountIn) * ethPrice
+    let colIn1 = null
+    let colIn2 = (incLoanWeightedAvg.eth + ltvLoanWeightedAvg.eth) * web3.utils.fromWei(amountIn) * ethPrice
+    let sOut = colIn2 + 1
+    console.log("sOut > colIn2: " + (sOut > colIn2))
+    console.log("sOut: " + sOut)
+    console.log("colIn2: " + colIn2)
+    console.log("incLoanWeightedAvg.eth: " + incLoanWeightedAvg.eth)
+    console.log("ltvLoanWeightedAvg.eth: " + ltvLoanWeightedAvg.eth)
 
-
-
-
-
-
+    while(sOut > colIn2) {
+        console.log("here")
+        colIn1 = colIn2
+        colIn2 = (incLoanWeightedAvg.eth + ltvLoanWeightedAvg.eth) * web3.utils.fromWei(amountIn) * ethPrice
+        // axios
+        //     .get(ONE_INCH_URL + "fromTokenAddress=" + ethTokenAddress + "&toTokenAddress=" + maticTokenAddress + "&amount=" + amount)
+        //     .then(res => {
+        //         amountOut = res.data.toTokenAmount
+        //     })
+        //     .catch(err => {
+        //         console.log(err);
+        //     });
+        result = await axios.get(ONE_INCH_URL + "fromTokenAddress=" + ethTokenAddress + "&toTokenAddress=" + maticTokenAddress + "&amount=" + amountIn)
+        amountOut = result.data.toTokenAmount
+        console.log("amountOUt: " + amountOut)
+        sOut = web3.utils.fromWei(amountOut) * maticPrice
+        amountIn = amountIn * 2
+    }
+    console.log("toxicity: ", cTotal.ethCollateral.matic / colIn1)
 
 }
 
@@ -453,9 +558,22 @@ function mergeByAddress(arr1, arr2) {
     return Array.from(map.values());
 }
 
+function query(lastID) {
+    let _query = `
+    query {
+        transfers(first: 1000, where:{ id_gt: "` + lastID + `"}) {
+            id
+            contract
+            to
+        } 	
+    }
+    `
+    return _query
+}
+
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
-main(process.env.NODE_URL_POLYGON).catch((error) => {
+main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
