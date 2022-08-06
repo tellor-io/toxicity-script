@@ -146,6 +146,18 @@ contract ERC20 is IERC20 {
         return (0, _balances[account], _borrowBalances[account], _totalSupply);
     }
 
+    function getCash() external view returns (uint) {
+        return _totalSupply;
+    }
+
+    function totalBorrows() external view returns(uint256) {
+        return _totalSupply;
+    }
+
+    function totalReserves() external view returns(uint256) {
+        return _totalSupply;
+    }
+
     /**
      * @dev Returns the symbol of the token, usually a shorter version of the
      * name.
