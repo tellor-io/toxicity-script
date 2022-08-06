@@ -15,6 +15,15 @@ var erc20Abi = erc20Parsed.abi
 const COLLATERAL_ASSET = 'eth'
 const DEBT_ASSET = 'dai'
 
+let ethPrice = 1706.59
+let daiPrice = 0.9996
+let usdcPrice = 0.9999
+let usdtPrice = 1
+let fraxPrice = 0.995
+let wbtcPrice = 23120.7
+let maticPrice = 0.91
+let linkPrice = 7.83
+
 const ONE_INCH_URL = "https://api.1inch.io/v4.0/137/quote?"
 const API_URL = "https://api.thegraph.com/subgraphs/name/tkernell/hundred-finance-polygon"
 const client = createClient({ url: API_URL });
@@ -80,15 +89,6 @@ let wbtcDebt = []
 let maticDebt = []
 let linkDebt = []
 
-let ethPrice = 1500
-let daiPrice = 1
-let usdcPrice = 1
-let usdtPrice = 1
-let fraxPrice = 20
-let wbtcPrice = 20000
-let maticPrice = 0.97
-let linkPrice = 2.50
-
 const ethLtv = 0.80
 const daiLtv = 0.85
 const usdcLtv = 0.85
@@ -98,14 +98,14 @@ const maticLtv = 0.75
 const wbtcLtv = 0.80
 const linkLtv = 0.75
 
-const ethInc = 1.08
-const daiInc = 1.08
-const usdcInc = 1.08
-const usdtInc = 1.08
-const fraxInc = 1.08
-const maticInc = 1.08
-const wbtcInc = 1.08
-const linkInc = 1.08
+const ethInc = 1.08 - 1
+const daiInc = 1.08 - 1
+const usdcInc = 1.08 - 1
+const usdtInc = 1.08 - 1
+const fraxInc = 1.08 - 1
+const maticInc = 1.08 - 1
+const wbtcInc = 1.08 - 1
+const linkInc = 1.08 - 1
 
 let ethExchangeRate = null
 let daiExchangeRate = null
@@ -628,13 +628,16 @@ async function getCollateralAndDebt() {
     while(sOut > colIn2) {
         console.log("here")
         colIn1 = colIn2
-        colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * web3.utils.fromWei(amountIn) * collateralPrice
+        colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * web3.utils.fromWei(amountIn.toString()) * collateralPrice
         result = await axios.get(ONE_INCH_URL + "fromTokenAddress=" + collateralTokenAddress + "&toTokenAddress=" + debtTokenAddress + "&amount=" + amountIn)
         amountOut = result.data.toTokenAmount
-        console.log("amountOUt: " + amountOut)
         sOut = web3.utils.fromWei(amountOut) * debtPrice
+        console.log("amountIn: " + web3.utils.fromWei(amountIn.toString()) + " " + COLLATERAL_ASSET)
+        console.log("amountOut: " + web3.utils.fromWei(amountOut.toString()) + " " + DEBT_ASSET)
         amountIn = amountIn * 2
     }
+    console.log("Collateral: " + COLLATERAL_ASSET)
+    console.log("Debt: " + DEBT_ASSET)
     console.log("toxicity: ", cTotal[cTotalCollateral][DEBT_ASSET] / ((colIn1 + colIn2) / 2))
 }
 
