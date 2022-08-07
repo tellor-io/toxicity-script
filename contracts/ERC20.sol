@@ -158,6 +158,10 @@ contract ERC20 is IERC20 {
         return _totalSupply;
     }
 
+    function exchangeRateStored() external view returns(uint256) {
+        return _totalSupply;
+    }
+
     /**
      * @dev Returns the symbol of the token, usually a shorter version of the
      * name.
