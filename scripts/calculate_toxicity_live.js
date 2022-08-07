@@ -133,7 +133,7 @@ async function main(_nodeURL) {
     // separate the addresses into different arrays based on token
     parseTransfersAndMints(txTransfers, txMints)
 
-    // get the balance of each address
+    // get the balance of each address and hToken exchange rates
     await getSnapshots()
 
     // get toxicity
