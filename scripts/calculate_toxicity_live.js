@@ -12,17 +12,8 @@ var erc20Abi = erc20Parsed.abi
 
 // NOTICE: change these variables
 // choices: eth, dai, usdc, usdt, frax, wbtc, matic, link
-const COLLATERAL_ASSET = 'wbtc'
-const DEBT_ASSET = 'matic'
-
-let ethPrice = 1706.59
-let daiPrice = 0.9996
-let usdcPrice = 0.9999
-let usdtPrice = 1
-let fraxPrice = 0.995
-let wbtcPrice = 23120.7
-let maticPrice = 0.91
-let linkPrice = 7.83
+const COLLATERAL_ASSET = 'matic'
+const DEBT_ASSET = 'frax'
 
 const ONE_INCH_URL = "https://api.1inch.io/v4.0/137/quote?"
 const API_URL = "https://api.thegraph.com/subgraphs/name/tkernell/hundred-finance-polygon"
@@ -50,6 +41,15 @@ const fraxTokenAddress = "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89";
 const wbtcTokenAddress = "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6";
 const maticTokenAddress = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // wrapped matic
 const linkTokenAddress = "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39";
+
+let ethPrice = 0
+let daiPrice = 0
+let usdcPrice = 0
+let usdtPrice = 0
+let fraxPrice = 0
+let wbtcPrice = 0
+let maticPrice = 0
+let linkPrice = 0
 
 let ethUserAddresses = []
 let daiUserAddresses = []
@@ -123,13 +123,6 @@ let ltvLoanWeightedAvg = null
 let cTotal = []
 
 async function main(_nodeURL) {
-
-    const accounts = await ethers.getSigners()
-
-    let privateKey = process.env.TESTNET_PK
-    // let provider = new ethers.providers.JsonRpcProvider(_nodeURL)
-    let wallet = new ethers.Wallet(privateKey, provider)
-
     // get prices
     await getPrices()
 
@@ -143,7 +136,8 @@ async function main(_nodeURL) {
     // get the balance of each address
     await getSnapshots()
 
-    await getCollateralAndDebt()
+    // get toxicity
+    await getToxicity()
 }
 
 async function getPrices() {
@@ -171,11 +165,12 @@ async function getPrices() {
     result = await axios.get(COINGECKO_API_PART1 + "matic-network" + COINGECKO_API_PART2)
     maticPrice = result.data["matic-network"].usd
 
-    result = await axios.get(COINGECKO_API_PART1 + "link" + COINGECKO_API_PART2)
-    linkPrice = result.data.link.usd
+    result = await axios.get(COINGECKO_API_PART1 + "chainlink" + COINGECKO_API_PART2)
+    linkPrice = result.data.chainlink.usd
 }
 
 async function fetchTransfers() {
+    console.log("fetching transfers...")
     let responseTransfers = await client.query(queryTransfers('')).toPromise()
     let responseAllTransfers = []
 
@@ -189,6 +184,7 @@ async function fetchTransfers() {
 }
 
 async function fetchMints() {
+    console.log("fetching mints...")
     let responseMints = await client.query(queryMints('')).toPromise()
     let responseAllMints = []
 
@@ -202,50 +198,6 @@ async function fetchMints() {
 }
 
 function parseTransfersAndMints(txTransfers, txMints) {
-
-    // for(let i=0; i<txTransfers.length; i++) {
-    //     if(txTransfers[i].contract == hEthTokenAddress) {
-    //         if(txTransfers[i].to != hEthTokenAddress) {
-    //             ethUserAddresses.push(txTransfers[i].to)
-    //             daiUserAddresses.push(txTransfers[i].to)
-    //             usdcUserAddresses.push(txTransfers[i].to)
-    //             usdtUserAddresses.push(txTransfers[i].to)
-    //             fraxUserAddresses.push(txTransfers[i].to)
-    //             wbtcUserAddresses.push(txTransfers[i].to)
-    //             maticUserAddresses.push(txTransfers[i].to)
-    //             linkUserAddresses.push(txTransfers[i].to)
-    //         }
-    //     } else if(txTransfers[i].contract == hDaiTokenAddress) {
-    //         if(txTransfers[i].to != hDaiTokenAddress) {
-    //             daiUserAddresses.push(txTransfers[i].to)
-    //         }
-    //     } else if(txTransfers[i].contract == hUsdcTokenAddress) {
-    //         if(txTransfers[i].to != hUsdcTokenAddress) {
-    //             usdcUserAddresses.push(txTransfers[i].to)
-    //         }
-    //     } else if(txTransfers[i].contract == hUsdtTokenAddress) {
-    //         if(txTransfers[i].to != hUsdtTokenAddress) {
-    //             usdtUserAddresses.push(txTransfers[i].to)
-    //         }
-    //     } else if(txTransfers[i].contract == hFraxTokenAddress) {
-    //         if(txTransfers[i].to != hFraxTokenAddress) {
-    //             fraxUserAddresses.push(txTransfers[i].to)
-    //         }
-    //     } else if(txTransfers[i].contract == hWbtcTokenAddress) {
-    //         if(txTransfers[i].to != hWbtcTokenAddress) {
-    //             wbtcUserAddresses.push(txTransfers[i].to)
-    //         }
-    //     } else if(txTransfers[i].contract == hMaticTokenAddress) {
-    //         if(txTransfers[i].to != hMaticTokenAddress) {
-    //             maticUserAddresses.push(txTransfers[i].to)
-    //         }
-    //     } else if(txTransfers[i].contract == hLinkTokenAddress) {
-    //         if(txTransfers[i].to != hLinkTokenAddress) {
-    //             linkUserAddresses.push(txTransfers[i].to)
-    //         }
-    //     } 
-    // }
-
     for(let i=0; i<txTransfers.length; i++) {
         if(txTransfers[i].to != hEthTokenAddress && txTransfers[i].to != hDaiTokenAddress && txTransfers[i].to != hUsdcTokenAddress && txTransfers[i].to != hUsdtTokenAddress && txTransfers[i].to != hFraxTokenAddress && txTransfers[i].to != hWbtcTokenAddress && txTransfers[i].to != hMaticTokenAddress && txTransfers[i].to != hLinkTokenAddress) {
             ethUserAddresses.push(txTransfers[i].to)
@@ -258,8 +210,6 @@ function parseTransfersAndMints(txTransfers, txMints) {
             linkUserAddresses.push(txTransfers[i].to)
         }
     }
-
-    console.log("ethUserAddresses length: " + ethUserAddresses.length)
 
     for(let i=0; i<txMints.length; i++) {
         if(txMints[i].contract == hEthTokenAddress) {
@@ -297,8 +247,6 @@ function parseTransfersAndMints(txTransfers, txMints) {
         }
     }
 
-    console.log("ethUserAddresses length: " + ethUserAddresses.length)
-
     ethUserAddresses = uniq(ethUserAddresses)
     daiUserAddresses = uniq(daiUserAddresses)
     usdcUserAddresses = uniq(usdcUserAddresses)
@@ -310,6 +258,7 @@ function parseTransfersAndMints(txTransfers, txMints) {
 }
 
 async function getSnapshots() {
+    console.log("querying contracts...")
     const callProvider = new Provider(provider)
     await callProvider.init()
     const ERC20 = ethers.getContractAt("ERC20", hEthTokenAddress)
@@ -341,90 +290,20 @@ async function getSnapshots() {
     maticSnapshot = await callProvider.all(maticContractCalls)
     linkSnapshot = await callProvider.all(linkContractCalls)
 
+
     ethContract = await ethers.getContractAt('ERC20', hEthTokenAddress, wallet)
-    ethCash = await ethContract.getCash()
-    ethTotalBorrows = await ethContract.totalBorrows()
-    ethTotalReserves = await ethContract.totalReserves()
-    ethTotalSupply = await ethContract.totalSupply()
-    ethExchangeRate = (ethCash + ethTotalBorrows - ethTotalReserves) / ethTotalSupply
-
     daiContract = await ethers.getContractAt('ERC20', hDaiTokenAddress, wallet)
-    daiCash = await daiContract.getCash()
-    daiTotalBorrows = await daiContract.totalBorrows()
-    daiTotalReserves = await daiContract.totalReserves()
-    daiTotalSupply = await daiContract.totalSupply()
-    daiExchangeRate = (daiCash + daiTotalBorrows - daiTotalReserves) / daiTotalSupply
-
     usdcContract = await ethers.getContractAt('ERC20', hUsdcTokenAddress, wallet)
-    usdcCash = await usdcContract.getCash()
-    usdcTotalBorrows = await usdcContract.totalBorrows()
-    usdcTotalReserves = await usdcContract.totalReserves()
-    usdcTotalSupply = await usdcContract.totalSupply()
-    usdcExchangeRate = (usdcCash + usdcTotalBorrows - usdcTotalReserves) / usdcTotalSupply
-
     usdtContract = await ethers.getContractAt('ERC20', hUsdtTokenAddress, wallet)
-    usdtCash = await usdtContract.getCash()
-    usdtTotalBorrows = await usdtContract.totalBorrows()
-    usdtTotalReserves = await usdtContract.totalReserves()
-    usdtTotalSupply = await usdtContract.totalSupply()
-    usdtExchangeRate = (usdtCash + usdtTotalBorrows - usdtTotalReserves) / usdtTotalSupply
-
     fraxContract = await ethers.getContractAt('ERC20', hFraxTokenAddress, wallet)
-    fraxCash = await fraxContract.getCash()
-    fraxTotalBorrows = await fraxContract.totalBorrows()
-    fraxTotalReserves = await fraxContract.totalReserves()
-    fraxTotalSupply = await fraxContract.totalSupply()
-    fraxExchangeRate = (fraxCash + fraxTotalBorrows - fraxTotalReserves) / fraxTotalSupply
-
     wbtcContract = await ethers.getContractAt('ERC20', hWbtcTokenAddress, wallet)
-    wbtcCash = await wbtcContract.getCash()
-    wbtcTotalBorrows = await wbtcContract.totalBorrows()
-    wbtcTotalReserves = await wbtcContract.totalReserves()
-    wbtcTotalSupply = await wbtcContract.totalSupply()
-    wbtcExchangeRate = (wbtcCash + wbtcTotalBorrows - wbtcTotalReserves) / wbtcTotalSupply
-
     maticContract = await ethers.getContractAt('ERC20', hMaticTokenAddress, wallet)
-    maticCash = await maticContract.getCash()
-    maticTotalBorrows = await maticContract.totalBorrows()
-    maticTotalReserves = await maticContract.totalReserves()
-    maticTotalSupply = await maticContract.totalSupply()
-    maticExchangeRate = (maticCash + maticTotalBorrows - maticTotalReserves) / maticTotalSupply
-
     linkContract = await ethers.getContractAt('ERC20', hLinkTokenAddress, wallet)
-    linkCash = await linkContract.getCash()
-    linkTotalBorrows = await linkContract.totalBorrows()
-    linkTotalReserves = await linkContract.totalReserves()
-    linkTotalSupply = await linkContract.totalSupply()
-    linkExchangeRate = (linkCash + linkTotalBorrows - linkTotalReserves) / linkTotalSupply
 
-    console.log("ethCash:", ethCash)
-    console.log("ethTotalBorrows:", ethTotalBorrows)
-    console.log("ethTotalReserves:", ethTotalReserves)
-    console.log("ethTotalSupply:", ethTotalSupply)
-    console.log("ethExchangeRate:", ethExchangeRate)
-
-
-    totalDebt = web3.utils.fromWei(ethTotalBorrows.toString()) * ethPrice + web3.utils.fromWei(daiTotalBorrows.toString()) * daiPrice + web3.utils.fromWei(usdcTotalBorrows.toString()) * usdcPrice + web3.utils.fromWei(usdtTotalBorrows.toString()) * usdtPrice + web3.utils.fromWei(fraxTotalBorrows.toString()) * fraxPrice + web3.utils.fromWei(wbtcTotalBorrows.toString()) * wbtcPrice + web3.utils.fromWei(maticTotalBorrows.toString()) * maticPrice + web3.utils.fromWei(linkTotalBorrows.toString()) * linkPrice
-    console.log("totalDebtA:", totalDebt)
-    console.log("ethTotalBorrows:", web3.utils.fromWei(ethTotalBorrows.toString()) * ethPrice)
-    console.log("daiTotalBorrows:", web3.utils.fromWei(daiTotalBorrows.toString()) * daiPrice)
-    console.log("usdcTotalBorrows:", web3.utils.fromWei(usdcTotalBorrows.toString()) * usdcPrice)
-    console.log("usdtTotalBorrows:", web3.utils.fromWei(usdtTotalBorrows.toString()) * usdtPrice)
-    console.log("fraxTotalBorrows:", web3.utils.fromWei(fraxTotalBorrows.toString()) * fraxPrice)
-    console.log("wbtcTotalBorrows:", web3.utils.fromWei(wbtcTotalBorrows.toString()) * wbtcPrice)
-    console.log("maticTotalBorrows:", web3.utils.fromWei(maticTotalBorrows.toString()) * maticPrice)
-    console.log("linkTotalBorrows:", web3.utils.fromWei(linkTotalBorrows.toString()) * linkPrice)
-
-
+    // get hToken -> underlying token exchange rates
     const cTokenDecimals = 8; // all cTokens have 8 decimal places
-
     const underlyingDecimals = 18;
-    const exchangeRateCurrent = await ethContract.exchangeRateStored();
     const mantissa = 18 + parseInt(underlyingDecimals) - cTokenDecimals;
-    const oneCTokenInUnderlying = exchangeRateCurrent / Math.pow(10, mantissa);
-    console.log('1 hETH can be redeemed for', oneCTokenInUnderlying, 'ETH');
-
-
 
     const ethExchangeRateCurrent = await ethContract.exchangeRateStored();
     ethExchangeRate = ethExchangeRateCurrent / Math.pow(10, mantissa);
@@ -451,7 +330,7 @@ async function getSnapshots() {
     linkExchangeRate = linkExchangeRateCurrent / Math.pow(10, mantissa);
 }
 
-async function getCollateralAndDebt() {
+async function getToxicity() {
     // eth
     for(i = 0; i < ethUserAddresses.length; i++) {
         if(ethSnapshot[i][1] > 0 || ethSnapshot[i][2] > 0) {
@@ -460,9 +339,6 @@ async function getCollateralAndDebt() {
             debtUsd = web3.utils.fromWei(ethSnapshot[i][2].toString()) * ethPrice
             ethCollateral.push({address: ethUserAddresses[i], eth: collateralUsd})
             ethDebt.push({address: ethUserAddresses[i], eth: debtUsd})
-            console.log("debt for", ethUserAddresses[i], "is", ethSnapshot[i][2])
-            console.log("debt recorded: ", debtUsd)
-            console.log(ethDebt[ethDebt.length - 1])
         }
     }
     // dai
@@ -536,15 +412,6 @@ async function getCollateralAndDebt() {
         }
     }
 
-    console.log("ethCollateralLength:", ethCollateral.length)
-    console.log("daiCollateralLength:", daiCollateral.length)
-    console.log("usdcCollateralLength:", usdcCollateral.length)
-    console.log("usdtCollateralLength:", usdtCollateral.length)
-    console.log("fraxCollateralLength:", fraxCollateral.length)
-    console.log("wbtcCollateralLength:", wbtcCollateral.length)
-    console.log("maticCollateralLength:", maticCollateral.length)
-    console.log("linkCollateralLength:", linkCollateral.length)
-
     collateral = mergeByAddress(ethCollateral, daiCollateral)
     collateral = mergeByAddress(collateral, usdcCollateral)
     collateral = mergeByAddress(collateral, usdtCollateral)
@@ -560,7 +427,6 @@ async function getCollateralAndDebt() {
     debt = mergeByAddress(debt, maticDebt)
     debt = mergeByAddress(debt, linkDebt)
 
-    console.log("debtLength: ", debt.length)
 
     // convert all NaN to 0
     for(i = 0; i < collateral.length; i++) {
@@ -617,43 +483,10 @@ async function getCollateralAndDebt() {
 
 
     // get L^qP -- total $-value of assets owed by user q on platform P
-    totalDebtB = 0
     for(i = 0; i < debt.length; i++) {
         debt[i].L = debt[i].eth + debt[i].dai + debt[i].usdc + debt[i].usdt + debt[i].frax + debt[i].wbtc + debt[i].matic + debt[i].link
-        totalDebtB += debt[i].L
     }
-    console.log("totalDebtB:", totalDebtB)
-
-    // get sum of all debt by asset
-    totalDebtEth = 0
-    totalDebtDai = 0
-    totalDebtUsdc = 0
-    totalDebtUsdt = 0
-    totalDebtFrax = 0
-    totalDebtWbtc = 0
-    totalDebtMatic = 0
-    totalDebtLink = 0
-
-    for(i = 0; i < debt.length; i++) {
-        totalDebtEth += debt[i].eth
-        totalDebtDai += debt[i].dai
-        totalDebtUsdc += debt[i].usdc
-        totalDebtUsdt += debt[i].usdt
-        totalDebtFrax += debt[i].frax
-        totalDebtWbtc += debt[i].wbtc
-        totalDebtMatic += debt[i].matic
-        totalDebtLink += debt[i].link
-    }
-
-    console.log("totalDebtEth:", totalDebtEth)
-    console.log("totalDebtDai:", totalDebtDai)
-    console.log("totalDebtUsdc:", totalDebtUsdc)
-    console.log("totalDebtUsdt:", totalDebtUsdt)
-    console.log("totalDebtFrax:", totalDebtFrax)
-    console.log("totalDebtWbtc:", totalDebtWbtc)
-    console.log("totalDebtMatic:", totalDebtMatic)
-    console.log("totalDebtLink:", totalDebtLink)
-
+   
     // get r_i^qP -- share of loans collateralized by asset i owned by user q on platform P
     for(i = 0; i < collateral.length; i++) {
         let denominator = ethLtv * collateral[i].eth + daiLtv * collateral[i].dai + usdcLtv * collateral[i].usdc + usdtLtv * collateral[i].usdt + fraxLtv * collateral[i].frax + wbtcLtv * collateral[i].wbtc + maticLtv * collateral[i].matic + linkLtv * collateral[i].link
@@ -782,29 +615,19 @@ async function getCollateralAndDebt() {
         debtTokenAddress = linkTokenAddress
     }
 
-    // get liquidity        
+    // get liquidity       
+    console.log("getting liquidity...") 
     amountIn = 0.1
     amountOut = null
     let colIn1 = null
     let colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * amountIn * collateralPrice
     let sOut = colIn2 + 1
-    console.log("incLoanWeightedAvg[COLLATERAL_ASSET]:", incLoanWeightedAvg[COLLATERAL_ASSET])
-    console.log("ltvLoanWeightedAvg[COLLATERAL_ASSET]:", ltvLoanWeightedAvg[COLLATERAL_ASSET])
-    console.log("amountIn:", amountIn)
-    console.log("collateralPrice:", collateralPrice)
-    console.log("colIn2: ", colIn2)
-    console.log("sOut: ", sOut)
-    console.log("sOut > colIn2: ", sOut > colIn2)
-    console.log("before loop")
     while(sOut > colIn2) {
-        console.log("here")
         colIn1 = colIn2
         colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * amountIn * collateralPrice
         result = await axios.get(ONE_INCH_URL + "fromTokenAddress=" + collateralTokenAddress + "&toTokenAddress=" + debtTokenAddress + "&amount=" + web3.utils.toWei(amountIn.toString()))
         amountOut = web3.utils.fromWei(result.data.toTokenAmount.toString())
         sOut = amountOut * debtPrice
-        console.log("amountIn: " + amountIn.toString() + " " + COLLATERAL_ASSET)
-        console.log("amountOut: " + amountOut.toString() + " " + DEBT_ASSET)
         amountIn = amountIn * 2
     }
     console.log("Collateral: " + COLLATERAL_ASSET)
@@ -822,10 +645,6 @@ function uniq(a) {
         else
             return objs.indexOf(item) >= 0 ? false : objs.push(item);
     });
-}
-
-function fromEightDec(val) {
-    return (web3.utils.fromWei(val.toString(), 'shannon') * 10)
 }
 
 function mergeByAddress(arr1, arr2) {
@@ -861,8 +680,6 @@ function queryMints(lastID) {
     return _query
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
 main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
