@@ -130,6 +130,9 @@ async function main(_nodeURL) {
     // let provider = new ethers.providers.JsonRpcProvider(_nodeURL)
     let wallet = new ethers.Wallet(privateKey, provider)
 
+    // get prices
+    await getPrices()
+
     // get all transfer events from the graph
     let txTransfers = await fetchTransfers()
     let txMints = await fetchMints()
@@ -141,6 +144,35 @@ async function main(_nodeURL) {
     await getSnapshots()
 
     await getCollateralAndDebt()
+}
+
+async function getPrices() {
+    const COINGECKO_API_PART1 = "https://api.coingecko.com/api/v3/simple/price?ids="
+    const COINGECKO_API_PART2 = "&vs_currencies=usd&include_market_cap=false&include_24hr_vol=false&include_24hr_change=false&include_last_updated_at=false"
+
+    result = await axios.get(COINGECKO_API_PART1 + "ethereum" + COINGECKO_API_PART2)
+    ethPrice = result.data.ethereum.usd
+
+    result = await axios.get(COINGECKO_API_PART1 + "dai" + COINGECKO_API_PART2)
+    daiPrice = result.data.dai.usd
+
+    result = await axios.get(COINGECKO_API_PART1 + "usd-coin" + COINGECKO_API_PART2)
+    usdcPrice = result.data["usd-coin"].usd
+
+    result = await axios.get(COINGECKO_API_PART1 + "tether" + COINGECKO_API_PART2)
+    usdtPrice = result.data.tether.usd
+
+    result = await axios.get(COINGECKO_API_PART1 + "frax" + COINGECKO_API_PART2)
+    fraxPrice = result.data.frax.usd
+
+    result = await axios.get(COINGECKO_API_PART1 + "bitcoin" + COINGECKO_API_PART2)
+    wbtcPrice = result.data.bitcoin.usd
+
+    result = await axios.get(COINGECKO_API_PART1 + "matic-network" + COINGECKO_API_PART2)
+    maticPrice = result.data["matic-network"].usd
+
+    result = await axios.get(COINGECKO_API_PART1 + "link" + COINGECKO_API_PART2)
+    linkPrice = result.data.link.usd
 }
 
 async function fetchTransfers() {
