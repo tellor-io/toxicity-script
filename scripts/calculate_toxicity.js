@@ -13,7 +13,7 @@ var erc20Abi = erc20Parsed.abi
 // NOTICE: change these variables
 // choices: eth, dai, usdc, usdt, frax, wbtc, matic, link
 const COLLATERAL_ASSET = 'matic'
-const DEBT_ASSET = 'frax'
+const DEBT_ASSET = 'dai'
 
 const ONE_INCH_URL = "https://api.1inch.io/v4.0/137/quote?"
 const API_URL = "https://api.thegraph.com/subgraphs/name/tkernell/hundred-finance-polygon"
@@ -617,7 +617,7 @@ async function getToxicity() {
 
     // get liquidity       
     console.log("getting liquidity...") 
-    amountIn = 0.1
+    amountIn = 1
     amountOut = null
     let colIn1 = null
     let colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * amountIn * collateralPrice
@@ -630,6 +630,19 @@ async function getToxicity() {
         sOut = amountOut * debtPrice
         amountIn = amountIn * 2
     }
+    amountIn = amountIn / 4
+    increment = amountIn / 10
+    amountIn = amountIn + increment
+    colIn2 = colIn1
+    while(sOut > colIn2) {
+        colIn1 = colIn2
+        colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * amountIn * collateralPrice
+        result = await axios.get(ONE_INCH_URL + "fromTokenAddress=" + collateralTokenAddress + "&toTokenAddress=" + debtTokenAddress + "&amount=" + web3.utils.toWei(amountIn.toString()))
+        amountOut = web3.utils.fromWei(result.data.toTokenAmount.toString())
+        sOut = amountOut * debtPrice
+        amountIn = amountIn + increment
+    }
+
     console.log("Collateral: " + COLLATERAL_ASSET)
     console.log("Debt: " + DEBT_ASSET)
     console.log("toxicity: ", cTotal[cTotalCollateral][DEBT_ASSET] / ((colIn1 + colIn2) / 2))
