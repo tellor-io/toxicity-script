@@ -12,8 +12,8 @@ var erc20Abi = erc20Parsed.abi
 
 // NOTICE: change these variables
 // choices: eth, dai, usdc, usdt, frax, wbtc, matic, link
-const COLLATERAL_ASSET = 'matic'
-const DEBT_ASSET = 'dai'
+let COLLATERAL_ASSET = 'matic'
+let DEBT_ASSET = 'dai'
 
 const abiCoder = new ethers.utils.AbiCoder()
 const ONE_INCH_URL = "https://api.1inch.io/v4.0/137/quote?"
@@ -85,17 +85,17 @@ let balPrice = 3
 let crvPrice = 4
 let daiPrice = 1
 let dpiPrice = 6
-let ethPrice = 1296
+let ethPrice = 1287
 let eursPrice = 8
 let ghstPrice = 0
 let fraxPrice = 0
 let jeurPrice = 0
-let linkPrice = 7.22
+let linkPrice = 7.15
 let maticPrice = 1.10
-let sushiPrice = 1.27
+let sushiPrice = 1.22
 let usdcPrice = 1
 let usdtPrice = 1
-let wbtcPrice = 17543
+let wbtcPrice = 17418
 
 let collateral = {}
 let ethCollateral = []
@@ -135,6 +135,12 @@ const maticLtvAave = 0.97
 const usdcLtvAave = 0.97
 const wbtcLtvAave = 0.97
 const ethLtvAave = 0.97
+const eursLtvAave = 0.97
+const crvLtvAave = 0.97
+const ghstLtvAave = 0.97
+const jeurLtvAave = 0.97
+const dpiLtvAave = 0.97
+const balLtvAave = 0.97
 
 const aaveIncAave = 1.02 - 1
 const ageurIncAave = 1.02 - 1
@@ -146,6 +152,12 @@ const maticIncAave = 1.02 - 1
 const usdcIncAave = 1.02 - 1
 const wbtcIncAave = 1.02 - 1
 const ethIncAave = 1.02 - 1
+const eursIncAave = 1.02 - 1
+const crvIncAave = 1.02 - 1
+const ghstIncAave = 1.02 - 1
+const jeurIncAave = 1.02 - 1
+const dpiIncAave = 1.02 - 1
+const balIncAave = 1.02 - 1
 
 let rShare = []
 let LByAsset = null
@@ -257,11 +269,10 @@ async function fetchBalances() {
 
 function parseBalances(txBalances) {
     console.log("Parsing balances...")
-    // for(let i=0; i<txBalances.length; i++) {
-    for(let i=0; i<10000; i++) {
+    for(let i=0; i<txBalances.length; i++) {
+    // for(let i=0; i<5000; i++) {
         // console.log(i)
         if(txBalances[i].protocol == 'aavePolygon') {
-            // console.log("this protocol is aavePolygon")
             thisOwner = txBalances[i].owner.toLowerCase()
             // console.log("owner found")
             if(collateral[thisOwner] == undefined) {
@@ -596,14 +607,7 @@ async function getToxicity2() {
     for(i = 0; i < Object.keys(debt).length; i++) {
         for(j = 0; j < colStrings.length; j++) {
             for(k = 0; k < debtStrings.length; k++) {
-                cTotal[colStrings[j]][debtStrings[k]] += rShare[i][debtStrings[k]] * debt[Object.keys(debt)[i]][debtStrings[j]]
-                // if(rShare[i][debtStrings[k]] * debt[Object.keys(debt)[i]][debtStrings[j]] > 0) {
-                //     console.log("nonzero cTotal")
-                // }
-
-                // if(debt[Object.keys(debt)[i]][debtStrings[j]] > 0) {
-                //     console.log("nonzero debt: " + Object.keys(debt)[i] + " " + debtStrings[j])
-                // }
+                cTotal[colStrings[j]][debtStrings[k]] += rShare[i][debtStrings[j]] * debt[Object.keys(debt)[i]][debtStrings[k]]
             }
         }
     }
@@ -687,54 +691,32 @@ async function getToxicity2() {
     amountIn = 1
     amountOut = null
     let colIn1 = null
-    console.log("here0")
     let colIn2 = incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET] * amountIn * collateralPrice
-    console.log("here1")
     let sOut = colIn2 + 1
     while(sOut > colIn2) {
         colIn1 = colIn2
-        console.log("here2")
         colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * amountIn * collateralPrice
-        console.log("here3")
         result = await axios.get(ONE_INCH_URL + "fromTokenAddress=" + collateralTokenAddress + "&toTokenAddress=" + debtTokenAddress + "&amount=" + web3.utils.toWei(amountIn.toString()))
-        console.log("here4")
         amountOut = web3.utils.fromWei(result.data.toTokenAmount.toString())
-        console.log("here5")
         sOut = amountOut * debtPrice
-        console.log("here6")
         amountIn = amountIn * 2
-        console.log("here7")
     }
-    console.log("here8")
     amountIn = amountIn / 4
-    console.log("here9")
     increment = amountIn / 10
-    console.log("here10")
     amountIn = amountIn + increment
-    console.log("here11")
     colIn2 = colIn1
-    console.log("here12")
     while(sOut > colIn2) {
-        console.log("here13")
         colIn1 = colIn2
-        console.log("here14")
         colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * amountIn * collateralPrice
-        console.log("here15")
         result = await axios.get(ONE_INCH_URL + "fromTokenAddress=" + collateralTokenAddress + "&toTokenAddress=" + debtTokenAddress + "&amount=" + web3.utils.toWei(amountIn.toString()))
-        console.log("here16")
         amountOut = web3.utils.fromWei(result.data.toTokenAmount.toString())
-        console.log("here17")
         sOut = amountOut * debtPrice
-        console.log("here18")
         amountIn = amountIn + increment
-        console.log("here19")
     }
-    console.log("here20")
     let toxicity = cTotal[cTotalCollateral][DEBT_ASSET] / ((colIn1 + colIn2) / 2)
     console.log("toxicity0: " + toxicity)
     console.log("Collateral: " + COLLATERAL_ASSET)
     console.log("Debt: " + DEBT_ASSET)
-    console.log("toxicity1: ", cTotal[cTotalCollateral][DEBT_ASSET] / (colIn1 + colIn2) / 2)
 
     // get queryId, queryData
     queryDataArgs = abiCoder.encode(["string", "string"], [COLLATERAL_ASSET, DEBT_ASSET])
@@ -743,7 +725,136 @@ async function getToxicity2() {
     queryId = web3.utils.keccak256(queryData)
     console.log("queryId: " + queryId)
     console.log("queryData: " + queryData)
+
+    await returnToxicity("eth", "dai")
+    await returnToxicity("eth", "usdt")
+    await returnToxicity("eth", "usdc")
+    await returnToxicity("matic", "dai")
+    await returnToxicity("matic", "usdt")
+    await returnToxicity("matic", "usdc")
+    await returnToxicity("wbtc", "dai")
+    await returnToxicity("wbtc", "usdt")
+    await returnToxicity("wbtc", "usdc")
         
+}
+
+async function returnToxicity(_collateralAsset, _debtAsset) {
+    COLLATERAL_ASSET = _collateralAsset
+    DEBT_ASSET = _debtAsset
+
+    if(COLLATERAL_ASSET == 'aave') {
+        collateralPrice = aavePrice
+        collateralTokenAddress = aaveTokenAddress
+        cTotalCollateral = "aaveCollateral"
+    } else if(COLLATERAL_ASSET == 'ageur') {
+        collateralPrice = ageurPrice
+        collateralTokenAddress = ageurTokenAddress
+        cTotalCollateral = "ageurCollateral"
+    } else if(COLLATERAL_ASSET == 'sushi') {
+        collateralPrice = sushiPrice
+        collateralTokenAddress = sushiTokenAddress
+        cTotalCollateral = "sushiCollateral"
+    } else if(COLLATERAL_ASSET == 'dai') {
+        collateralPrice = daiPrice
+        collateralTokenAddress = daiTokenAddress
+        cTotalCollateral = "daiCollateral"
+    } else if(COLLATERAL_ASSET == 'usdt') {
+        collateralPrice = usdtPrice
+        collateralTokenAddress = usdtTokenAddress
+        cTotalCollateral = "usdtCollateral"
+    } else if(COLLATERAL_ASSET == 'link') {
+        collateralPrice = linkPrice
+        collateralTokenAddress = linkTokenAddress
+        cTotalCollateral = "linkCollateral"
+    } else if(COLLATERAL_ASSET == 'matic') {
+        collateralPrice = maticPrice
+        collateralTokenAddress = maticTokenAddress
+        cTotalCollateral = "maticCollateral"
+    } else if(COLLATERAL_ASSET == 'usdc') {
+        collateralPrice = usdcPrice
+        collateralTokenAddress = usdcTokenAddress
+        cTotalCollateral = "usdcCollateral"
+    } else if(COLLATERAL_ASSET == 'wbtc') {
+        collateralPrice = wbtcPrice
+        collateralTokenAddress = wbtcTokenAddress
+        cTotalCollateral = "wbtcCollateral"
+    } else if(COLLATERAL_ASSET == 'eth') {
+        collateralPrice = ethPrice
+        collateralTokenAddress = ethTokenAddress
+        cTotalCollateral = "ethCollateral"
+    } 
+
+    if(DEBT_ASSET == 'aave') {
+        debtPrice = aavePrice
+        debtTokenAddress = aaveTokenAddress
+    } else if(DEBT_ASSET == 'ageur') {
+        debtPrice = ageurPrice
+        debtTokenAddress = ageurTokenAddress
+    } else if(DEBT_ASSET == 'sushi') {
+        debtPrice = sushiPrice
+        debtTokenAddress = sushiTokenAddress
+    } else if(DEBT_ASSET == 'dai') { 
+        debtPrice = daiPrice
+        debtTokenAddress = daiTokenAddress
+    } else if(DEBT_ASSET == 'usdt') {
+        debtPrice = usdtPrice
+        debtTokenAddress = usdtTokenAddress
+    } else if(DEBT_ASSET == 'link') {
+        debtPrice = linkPrice
+        debtTokenAddress = linkTokenAddress
+    } else if(DEBT_ASSET == 'matic') { 
+        debtPrice = maticPrice
+        debtTokenAddress = maticTokenAddress
+    } else if(DEBT_ASSET == 'usdc') { 
+        debtPrice = usdcPrice
+        debtTokenAddress = usdcTokenAddress
+    } else if(DEBT_ASSET == 'wbtc') { 
+        debtPrice = wbtcPrice
+        debtTokenAddress = wbtcTokenAddress
+    } else if(DEBT_ASSET == 'eth') { 
+        debtPrice = ethPrice
+        debtTokenAddress = ethTokenAddress
+    }
+
+    // get liquidity       
+    console.log("getting liquidity...") 
+    amountIn = 1
+    amountOut = null
+    let colIn1 = null
+    let colIn2 = incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET] * amountIn * collateralPrice
+    let sOut = colIn2 + 1
+    while(sOut > colIn2) {
+        colIn1 = colIn2
+        colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * amountIn * collateralPrice
+        result = await axios.get(ONE_INCH_URL + "fromTokenAddress=" + collateralTokenAddress + "&toTokenAddress=" + debtTokenAddress + "&amount=" + web3.utils.toWei(amountIn.toString()))
+        amountOut = web3.utils.fromWei(result.data.toTokenAmount.toString())
+        sOut = amountOut * debtPrice
+        amountIn = amountIn * 2
+    }
+    amountIn = amountIn / 4
+    increment = amountIn / 10
+    amountIn = amountIn + increment
+    colIn2 = colIn1
+    while(sOut > colIn2) {
+        colIn1 = colIn2
+        colIn2 = (incLoanWeightedAvg[COLLATERAL_ASSET] + ltvLoanWeightedAvg[COLLATERAL_ASSET]) * amountIn * collateralPrice
+        result = await axios.get(ONE_INCH_URL + "fromTokenAddress=" + collateralTokenAddress + "&toTokenAddress=" + debtTokenAddress + "&amount=" + web3.utils.toWei(amountIn.toString()))
+        amountOut = web3.utils.fromWei(result.data.toTokenAmount.toString())
+        sOut = amountOut * debtPrice
+        amountIn = amountIn + increment
+    }
+    let toxicity = cTotal[cTotalCollateral][DEBT_ASSET] / ((colIn1 + colIn2) / 2)
+    console.log("toxicity0: " + toxicity)
+    console.log("Collateral: " + COLLATERAL_ASSET)
+    console.log("Debt: " + DEBT_ASSET)
+
+    // get queryId, queryData
+    queryDataArgs = abiCoder.encode(["string", "string"], [COLLATERAL_ASSET, DEBT_ASSET])
+    queryData = abiCoder.encode(["string", "bytes"], ["LendingPairToxicity", queryDataArgs])
+    // keccak256 hash of queryData
+    queryId = web3.utils.keccak256(queryData)
+    console.log("queryId: " + queryId)
+    console.log("queryData: " + queryData)
 }
 
 
