@@ -17,11 +17,12 @@ const DEBT_ASSET = 'dai'
 
 const abiCoder = new ethers.utils.AbiCoder()
 const ONE_INCH_URL = "https://api.1inch.io/v4.0/137/quote?"
-const API_URL = "https://api.thegraph.com/subgraphs/id/QmZpeKvRGbiMH6dfsJjTWXZDBxRN4z8BU3iyHe6UfKr4Dv"
+const API_URL = "https://api.thegraph.com/subgraphs/name/tkernell/hundred-finance-polygon"
 const client = createClient({ url: API_URL });
 const provider = new ethers.providers.JsonRpcProvider(process.env.NODE_URL_POLYGON)
 const privateKey = process.env.TESTNET_PK
 const wallet = new ethers.Wallet(privateKey, provider)
+let txBalancesTemp = []
 
 // aToken addresses
 const aAaveAddress = "0xf329e36C7bF6E5E86ce2150875a84Ce77f477375"
@@ -159,6 +160,7 @@ async function main(_nodeURL) {
     // // get all transfer events from the graph
     // let txTransfers = await fetchTransfers2()
     let txBalances = await fetchBalances()
+    txBalancesTemp = txBalances
 
     // // // separate the addresses into different arrays based on token
     // // parseTransfersAndMints(txTransfers, txMints)
@@ -256,7 +258,7 @@ async function fetchBalances() {
 function parseBalances(txBalances) {
     console.log("Parsing balances...")
     // for(let i=0; i<txBalances.length; i++) {
-    for(let i=0; i<5000; i++) {
+    for(let i=0; i<10000; i++) {
         // console.log(i)
         if(txBalances[i].protocol == 'aavePolygon') {
             // console.log("this protocol is aavePolygon")
@@ -288,67 +290,67 @@ function parseBalances(txBalances) {
                 debt[thisOwner].wbtc = 0
                 debt[thisOwner].eth = 0
             }
-
+            
             if(txBalances[i].contract.toLowerCase() == aAaveAddress.toLowerCase()) {
-                collateral[thisOwner].aave += Number(txBalances[i].balance)
+                collateral[thisOwner].aave += web3.utils.fromWei(txBalances[i].balance) * aavePrice
             } else if(txBalances[i].contract.toLowerCase() == aAgeurAddress.toLowerCase()) {
-                collateral[thisOwner].ageur += Number(txBalances[i].balance)
+                collateral[thisOwner].ageur += web3.utils.fromWei(txBalances[i].balance) * ageurPrice
             } else if(txBalances[i].contract.toLowerCase() == aSushiAddress.toLowerCase()) {
-                collateral[thisOwner].sushi += Number(txBalances[i].balance)
+                collateral[thisOwner].sushi += web3.utils.fromWei(txBalances[i].balance) * sushiPrice
             } else if(txBalances[i].contract.toLowerCase() == aDaiAddress.toLowerCase()) {
-                collateral[thisOwner].dai += Number(txBalances[i].balance)
+                collateral[thisOwner].dai += web3.utils.fromWei(txBalances[i].balance) * daiPrice
             } else if(txBalances[i].contract.toLowerCase() == aUsdtAddress.toLowerCase()) {
-                collateral[thisOwner].usdt += Number(txBalances[i].balance)
+                collateral[thisOwner].usdt += web3.utils.fromWei(txBalances[i].balance) * usdtPrice
             } else if(txBalances[i].contract.toLowerCase() == aLinkAddress.toLowerCase()) {
-                collateral[thisOwner].link += Number(txBalances[i].balance)
+                collateral[thisOwner].link += web3.utils.fromWei(txBalances[i].balance) * linkPrice
             } else if(txBalances[i].contract.toLowerCase() == aWmaticAddress.toLowerCase()) {
-                collateral[thisOwner].matic += Number(txBalances[i].balance)
+                collateral[thisOwner].matic += web3.utils.fromWei(txBalances[i].balance) * maticPrice
             } else if(txBalances[i].contract.toLowerCase() == aUsdcAddress.toLowerCase()) {
-                collateral[thisOwner].usdc += Number(txBalances[i].balance)
+                collateral[thisOwner].usdc += web3.utils.fromWei(txBalances[i].balance) * usdcPrice
             } else if(txBalances[i].contract.toLowerCase() == aWbtcAddress.toLowerCase()) {
-                collateral[thisOwner].wbtc += Number(txBalances[i].balance)
+                collateral[thisOwner].wbtc += (web3.utils.fromWei(txBalances[i].balance, "gwei") * wbtcPrice * 10)
             } else if(txBalances[i].contract.toLowerCase() == aWethAddress.toLowerCase()) {
-                collateral[thisOwner].eth += Number(txBalances[i].balance)
+                collateral[thisOwner].eth += web3.utils.fromWei(txBalances[i].balance) * ethPrice
             } else if(txBalances[i].contract.toLowerCase() == aAaveSDebtAddress.toLowerCase()) {
-                debt[thisOwner].aave += Number(txBalances[i].balance)
+                debt[thisOwner].aave += web3.utils.fromWei(txBalances[i].balance) * aavePrice
             } else if(txBalances[i].contract.toLowerCase() == aAaveVDebtAddress.toLowerCase()) {
-                debt[thisOwner].aave += Number(txBalances[i].balance)
+                debt[thisOwner].aave += web3.utils.fromWei(txBalances[i].balance) * aavePrice
             } else if(txBalances[i].contract.toLowerCase() == aAgeurSDebtAddress.toLowerCase()) {
-                debt[thisOwner].ageur += Number(txBalances[i].balance)
+                debt[thisOwner].ageur += web3.utils.fromWei(txBalances[i].balance) * ageurPrice
             } else if(txBalances[i].contract.toLowerCase() == aAgeurVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].ageur += Number(txBalances[i].balance)
+                debt[thisOwner].ageur += web3.utils.fromWei(txBalances[i].balance) * ageurPrice
             } else if(txBalances[i].contract.toLowerCase() == aSushiSDebtAddress.toLowerCase()) {
-                debt[thisOwner].sushi += Number(txBalances[i].balance)
+                debt[thisOwner].sushi += web3.utils.fromWei(txBalances[i].balance) * sushiPrice
             } else if(txBalances[i].contract.toLowerCase() == aSushiVDebtAddress.toLowerCase()) {
-                debt[thisOwner].sushi += Number(txBalances[i].balance)
+                debt[thisOwner].sushi += web3.utils.fromWei(txBalances[i].balance) * sushiPrice
             } else if(txBalances[i].contract.toLowerCase() == aDaiSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].dai += Number(txBalances[i].balance)
+                debt[thisOwner].dai += web3.utils.fromWei(txBalances[i].balance) * daiPrice
             } else if(txBalances[i].contract.toLowerCase() == aDaiVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].dai += Number(txBalances[i].balance)
+                debt[thisOwner].dai += web3.utils.fromWei(txBalances[i].balance) * daiPrice
             } else if(txBalances[i].contract.toLowerCase() == aUsdtSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].usdt += Number(txBalances[i].balance)
+                debt[thisOwner].usdt += web3.utils.fromWei(txBalances[i].balance) * usdtPrice
             } else if(txBalances[i].contract.toLowerCase() == aUsdtVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].usdt += Number(txBalances[i].balance)
+                debt[thisOwner].usdt += web3.utils.fromWei(txBalances[i].balance) * usdtPrice
             } else if(txBalances[i].contract.toLowerCase() == aLinkSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].link += Number(txBalances[i].balance)
+                debt[thisOwner].link += web3.utils.fromWei(txBalances[i].balance) * linkPrice
             } else if(txBalances[i].contract.toLowerCase() == aLinkVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].link += Number(txBalances[i].balance)
+                debt[thisOwner].link += web3.utils.fromWei(txBalances[i].balance) * linkPrice
             } else if(txBalances[i].contract.toLowerCase() == aWmaticSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].matic += Number(txBalances[i].balance)
+                debt[thisOwner].matic += web3.utils.fromWei(txBalances[i].balance) * maticPrice
             } else if(txBalances[i].contract.toLowerCase() == aWmaticVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].matic += Number(txBalances[i].balance)
+                debt[thisOwner].matic += web3.utils.fromWei(txBalances[i].balance) * maticPrice
             } else if(txBalances[i].contract.toLowerCase() == aUsdcSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].usdc += Number(txBalances[i].balance)
+                debt[thisOwner].usdc += web3.utils.fromWei(txBalances[i].balance) * usdcPrice
             } else if(txBalances[i].contract.toLowerCase() == aUsdcVDebtAddress.toLowerCase()) {    
-                debt[thisOwner].usdc += Number(txBalances[i].balance)
+                debt[thisOwner].usdc += web3.utils.fromWei(txBalances[i].balance) * usdcPrice
             } else if(txBalances[i].contract.toLowerCase() == aWbtcSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].wbtc += Number(txBalances[i].balance)
+                debt[thisOwner].wbtc += (web3.utils.fromWei(txBalances[i].balance, "gwei") * wbtcPrice * 10)
             } else if(txBalances[i].contract.toLowerCase() == aWbtcVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].wbtc += Number(txBalances[i].balance)
+                debt[thisOwner].wbtc += (web3.utils.fromWei(txBalances[i].balance, "gwei") * wbtcPrice * 10)
             } else if(txBalances[i].contract.toLowerCase() == aWethSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].eth += Number(txBalances[i].balance)
+                debt[thisOwner].eth += web3.utils.fromWei(txBalances[i].balance) * ethPrice
             } else if(txBalances[i].contract.toLowerCase() == aWethVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].eth += Number(txBalances[i].balance)
+                debt[thisOwner].eth += web3.utils.fromWei(txBalances[i].balance) * ethPrice
             } else { 
                 console.log("Unknown contract: {}", [txBalances[i].contract])
             }
@@ -595,13 +597,13 @@ async function getToxicity2() {
         for(j = 0; j < colStrings.length; j++) {
             for(k = 0; k < debtStrings.length; k++) {
                 cTotal[colStrings[j]][debtStrings[k]] += rShare[i][debtStrings[k]] * debt[Object.keys(debt)[i]][debtStrings[j]]
-                if(rShare[i][debtStrings[k]] * debt[Object.keys(debt)[i]][debtStrings[j]] > 0) {
-                    console.log("nonzero cTotal")
-                }
+                // if(rShare[i][debtStrings[k]] * debt[Object.keys(debt)[i]][debtStrings[j]] > 0) {
+                //     console.log("nonzero cTotal")
+                // }
 
-                if(debt[Object.keys(debt)[i]][debtStrings[j]] > 0) {
-                    console.log("nonzero debt: " + Object.keys(debt)[i] + " " + debtStrings[j])
-                }
+                // if(debt[Object.keys(debt)[i]][debtStrings[j]] > 0) {
+                //     console.log("nonzero debt: " + Object.keys(debt)[i] + " " + debtStrings[j])
+                // }
             }
         }
     }
