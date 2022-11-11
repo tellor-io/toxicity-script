@@ -11,14 +11,16 @@ var erc20Parsed = JSON.parse(fs.readFileSync(erc20jsonFile));
 var erc20Abi = erc20Parsed.abi
 
 // NOTICE: change these variables
-// choices: eth, dai, usdc, usdt, frax, wbtc, matic, link
+// choices: eth, dai, usdc, usdt, wbtc, matic, link
 let COLLATERAL_ASSET = 'matic'
 let DEBT_ASSET = 'dai'
 
 const abiCoder = new ethers.utils.AbiCoder()
 const ONE_INCH_URL = "https://api.1inch.io/v4.0/137/quote?"
 const API_URL = "https://api.thegraph.com/subgraphs/name/tkernell/hundred-finance-polygon"
+const API_URL2 = "https://api.thegraph.com/subgraphs/name/tkernell/aave-polygon"
 const client = createClient({ url: API_URL });
+const client2 = createClient({ url: API_URL2 });
 const provider = new ethers.providers.JsonRpcProvider(process.env.NODE_URL_POLYGON)
 const privateKey = process.env.TESTNET_PK
 const wallet = new ethers.Wallet(privateKey, provider)
@@ -42,8 +44,8 @@ const aJeurAddress = "0x6533afac2E7BCCB20dca161449A13A32D391fb00"
 const aDpiAddress = "0x724dc807b04555b71ed48a6896b6F41593b8C637"
 const aBalAddress = "0x8ffDf2DE812095b1D19CB146E4c004587C0A0692"
 const aMimaticAddress = "0xeBe517846d0F36eCEd99C735cbF6131e1fEB775D"
-const aMaticXAddress = "0x80cA0d8C38d2e2BcbaB66aA1648Bd1C7160500FE"
-const aStMaticAddress = "0xEA1132120ddcDDA2F119e99Fa7A27a0d036F7Ac9"
+const aMaticxAddress = "0x80cA0d8C38d2e2BcbaB66aA1648Bd1C7160500FE"
+const aStmaticAddress = "0xEA1132120ddcDDA2F119e99Fa7A27a0d036F7Ac9"
 
 // aave debt token addresses
 const aAaveSDebtAddress = "0xfAeF6A702D15428E588d4C0614AEFb4348D83D48"
@@ -89,12 +91,9 @@ const usdtTokenAddress = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F";
 const wbtcTokenAddress = "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6";
 const maticTokenAddress = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // wrapped matic
 const linkTokenAddress = "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39";
-
 const aaveTokenAddress = "0xD6DF932A45C0f255f85145f286eA0b292B21C90B"
 const ageurTokenAddress = "0xE0B52e49357Fd4DAf2c15e02058DCE6BC0057db4"
 const sushiTokenAddress = "0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a" 
-
-const fraxTokenAddress = "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89";
 
 let aavePrice = 68.48
 let ageurPrice = 1.01
@@ -105,7 +104,6 @@ let dpiPrice = 6
 let ethPrice = 1287
 let eursPrice = 8
 let ghstPrice = 0
-let fraxPrice = 0
 let jeurPrice = 0
 let linkPrice = 7.15
 let maticPrice = 1.10
@@ -113,34 +111,13 @@ let sushiPrice = 1.22
 let usdcPrice = 1
 let usdtPrice = 1
 let wbtcPrice = 17418
+let mimaticPrice = maticPrice
+let maticxPrice = maticPrice
+let stmaticPrice = maticPrice
 
 let collateral = {}
-let ethCollateral = []
-let daiCollateral = []
-let usdcCollateral = []
-let usdtCollateral = []
-let fraxCollateral = []
-let wbtcCollateral = []
-let maticCollateral = []
-let linkCollateral = []
-
-let aaveCollateral = []
-let ageurCollateral = []
-let sushiCollateral = []
 
 let debt = {}
-let ethDebt = []
-let daiDebt = []
-let usdcDebt = []
-let usdtDebt = []
-let fraxDebt = []
-let wbtcDebt = []
-let maticDebt = []
-let linkDebt = []
-
-let aaveDebt = []
-let ageurDebt = []
-let sushiDebt = []
 
 const aaveLtvAave = 0.97
 const ageurLtvAave = 0.97
@@ -158,6 +135,9 @@ const ghstLtvAave = 0.97
 const jeurLtvAave = 0.97
 const dpiLtvAave = 0.97
 const balLtvAave = 0.97
+const mimaticLtvAave = 0.97
+const maticxLtvAave = 0.97
+const stmaticLtvAave = 0.97
 
 const aaveIncAave = 1.02 - 1
 const ageurIncAave = 1.02 - 1
@@ -175,6 +155,9 @@ const ghstIncAave = 1.02 - 1
 const jeurIncAave = 1.02 - 1
 const dpiIncAave = 1.02 - 1
 const balIncAave = 1.02 - 1
+const mimaticIncAave = 1.02 - 1
+const maticxIncAave = 1.02 - 1
+const stmaticIncAave = 1.02 - 1
 
 let rShare = []
 let LByAsset = null
@@ -185,22 +168,12 @@ let cTotal = []
 async function main(_nodeURL) {
     // get prices
     // await getPrices()
+    let txBalances1 = await fetchBalances(client)
+    let txBalances2 = await fetchBalances(client2)
+    txBalancesTemp = txBalances1
 
-    // // get all transfer events from the graph
-    // let txTransfers = await fetchTransfers2()
-    let txBalances = await fetchBalances()
-    txBalancesTemp = txBalances
+    parseBalances(txBalances1, txBalances2)
 
-    // // // separate the addresses into different arrays based on token
-    // // parseTransfersAndMints(txTransfers, txMints)
-    // parseTransfers2(txTransfers)
-    parseBalances(txBalances)
-
-    // // // // get the balance of each address and hToken exchange rates
-    // // // await getSnapshots()
-    // await getSnapshots2()
-
-    // // // // get toxicity
     await getToxicity2()
 }
 
@@ -270,27 +243,27 @@ async function getPrices() {
     // balPrice = result.data.bal.usd
 }
 
-async function fetchBalances() {
+async function fetchBalances(_client) {
     console.log("fetching balances...")
-    let responseBalances = await client.query(queryBalances('')).toPromise()
+    let responseBalances = await _client.query(queryBalances('')).toPromise()
     let responseAllBalances = []
 
     while(responseBalances.data.balances.length > 0) {
         responseAllBalances = responseAllBalances.concat(responseBalances.data.balances);
         lastID = responseBalances.data.balances[responseBalances.data.balances.length - 1].id
-        responseBalances = await client.query(queryBalances(lastID)).toPromise()
+        responseBalances = await _client.query(queryBalances(lastID)).toPromise()
     }
 
     return responseAllBalances
 }
 
-function parseBalances(txBalances) {
+function parseBalances(txBalances1, txBalances2) {
     console.log("Parsing balances...")
-    for(let i=0; i<txBalances.length; i++) {
-    // for(let i=0; i<5000; i++) {
+    // for(let i=0; i<txBalances1.length; i++) {
+    for(let i=0; i<2000; i++) {
         // console.log(i)
-        if(txBalances[i].protocol == 'aavePolygon') {
-            thisOwner = txBalances[i].owner.toLowerCase()
+        if(txBalances1[i].protocol == 'aavePolygon') {
+            thisOwner = txBalances1[i].owner.toLowerCase()
             // console.log("owner found")
             if(collateral[thisOwner] == undefined) {
                 // console.log("creating new collateral object")
@@ -305,6 +278,15 @@ function parseBalances(txBalances) {
                 collateral[thisOwner].usdc = 0
                 collateral[thisOwner].wbtc = 0
                 collateral[thisOwner].eth = 0
+                collateral[thisOwner].eurs = 0
+                collateral[thisOwner].jeur = 0
+                collateral[thisOwner].bal = 0
+                collateral[thisOwner].crv = 0
+                collateral[thisOwner].dpi = 0
+                collateral[thisOwner].ghst = 0
+                collateral[thisOwner].mimatic = 0
+                collateral[thisOwner].maticx = 0
+                collateral[thisOwner].stmatic = 0
 
                 debt[thisOwner] = {}
                 debt[thisOwner].aave = 0
@@ -317,71 +299,176 @@ function parseBalances(txBalances) {
                 debt[thisOwner].usdc = 0
                 debt[thisOwner].wbtc = 0
                 debt[thisOwner].eth = 0
+                debt[thisOwner].eurs = 0
+                debt[thisOwner].jeur = 0
+                debt[thisOwner].bal = 0
+                debt[thisOwner].crv = 0
+                debt[thisOwner].dpi = 0
+                debt[thisOwner].ghst = 0
+                debt[thisOwner].mimatic = 0
+                debt[thisOwner].maticx = 0
+                debt[thisOwner].stmatic = 0
             }
             
-            if(txBalances[i].contract.toLowerCase() == aAaveAddress.toLowerCase()) {
-                collateral[thisOwner].aave += web3.utils.fromWei(txBalances[i].balance) * aavePrice
-            } else if(txBalances[i].contract.toLowerCase() == aAgeurAddress.toLowerCase()) {
-                collateral[thisOwner].ageur += web3.utils.fromWei(txBalances[i].balance) * ageurPrice
-            } else if(txBalances[i].contract.toLowerCase() == aSushiAddress.toLowerCase()) {
-                collateral[thisOwner].sushi += web3.utils.fromWei(txBalances[i].balance) * sushiPrice
-            } else if(txBalances[i].contract.toLowerCase() == aDaiAddress.toLowerCase()) {
-                collateral[thisOwner].dai += web3.utils.fromWei(txBalances[i].balance) * daiPrice
-            } else if(txBalances[i].contract.toLowerCase() == aUsdtAddress.toLowerCase()) {
-                collateral[thisOwner].usdt += web3.utils.fromWei(txBalances[i].balance) * usdtPrice
-            } else if(txBalances[i].contract.toLowerCase() == aLinkAddress.toLowerCase()) {
-                collateral[thisOwner].link += web3.utils.fromWei(txBalances[i].balance) * linkPrice
-            } else if(txBalances[i].contract.toLowerCase() == aWmaticAddress.toLowerCase()) {
-                collateral[thisOwner].matic += web3.utils.fromWei(txBalances[i].balance) * maticPrice
-            } else if(txBalances[i].contract.toLowerCase() == aUsdcAddress.toLowerCase()) {
-                collateral[thisOwner].usdc += web3.utils.fromWei(txBalances[i].balance) * usdcPrice
-            } else if(txBalances[i].contract.toLowerCase() == aWbtcAddress.toLowerCase()) {
-                collateral[thisOwner].wbtc += (web3.utils.fromWei(txBalances[i].balance, "gwei") * wbtcPrice * 10)
-            } else if(txBalances[i].contract.toLowerCase() == aWethAddress.toLowerCase()) {
-                collateral[thisOwner].eth += web3.utils.fromWei(txBalances[i].balance) * ethPrice
-            } else if(txBalances[i].contract.toLowerCase() == aAaveSDebtAddress.toLowerCase()) {
-                debt[thisOwner].aave += web3.utils.fromWei(txBalances[i].balance) * aavePrice
-            } else if(txBalances[i].contract.toLowerCase() == aAaveVDebtAddress.toLowerCase()) {
-                debt[thisOwner].aave += web3.utils.fromWei(txBalances[i].balance) * aavePrice
-            } else if(txBalances[i].contract.toLowerCase() == aAgeurSDebtAddress.toLowerCase()) {
-                debt[thisOwner].ageur += web3.utils.fromWei(txBalances[i].balance) * ageurPrice
-            } else if(txBalances[i].contract.toLowerCase() == aAgeurVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].ageur += web3.utils.fromWei(txBalances[i].balance) * ageurPrice
-            } else if(txBalances[i].contract.toLowerCase() == aSushiSDebtAddress.toLowerCase()) {
-                debt[thisOwner].sushi += web3.utils.fromWei(txBalances[i].balance) * sushiPrice
-            } else if(txBalances[i].contract.toLowerCase() == aSushiVDebtAddress.toLowerCase()) {
-                debt[thisOwner].sushi += web3.utils.fromWei(txBalances[i].balance) * sushiPrice
-            } else if(txBalances[i].contract.toLowerCase() == aDaiSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].dai += web3.utils.fromWei(txBalances[i].balance) * daiPrice
-            } else if(txBalances[i].contract.toLowerCase() == aDaiVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].dai += web3.utils.fromWei(txBalances[i].balance) * daiPrice
-            } else if(txBalances[i].contract.toLowerCase() == aUsdtSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].usdt += web3.utils.fromWei(txBalances[i].balance) * usdtPrice
-            } else if(txBalances[i].contract.toLowerCase() == aUsdtVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].usdt += web3.utils.fromWei(txBalances[i].balance) * usdtPrice
-            } else if(txBalances[i].contract.toLowerCase() == aLinkSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].link += web3.utils.fromWei(txBalances[i].balance) * linkPrice
-            } else if(txBalances[i].contract.toLowerCase() == aLinkVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].link += web3.utils.fromWei(txBalances[i].balance) * linkPrice
-            } else if(txBalances[i].contract.toLowerCase() == aWmaticSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].matic += web3.utils.fromWei(txBalances[i].balance) * maticPrice
-            } else if(txBalances[i].contract.toLowerCase() == aWmaticVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].matic += web3.utils.fromWei(txBalances[i].balance) * maticPrice
-            } else if(txBalances[i].contract.toLowerCase() == aUsdcSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].usdc += web3.utils.fromWei(txBalances[i].balance) * usdcPrice
-            } else if(txBalances[i].contract.toLowerCase() == aUsdcVDebtAddress.toLowerCase()) {    
-                debt[thisOwner].usdc += web3.utils.fromWei(txBalances[i].balance) * usdcPrice
-            } else if(txBalances[i].contract.toLowerCase() == aWbtcSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].wbtc += (web3.utils.fromWei(txBalances[i].balance, "gwei") * wbtcPrice * 10)
-            } else if(txBalances[i].contract.toLowerCase() == aWbtcVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].wbtc += (web3.utils.fromWei(txBalances[i].balance, "gwei") * wbtcPrice * 10)
-            } else if(txBalances[i].contract.toLowerCase() == aWethSDebtAddress.toLowerCase()) { 
-                debt[thisOwner].eth += web3.utils.fromWei(txBalances[i].balance) * ethPrice
-            } else if(txBalances[i].contract.toLowerCase() == aWethVDebtAddress.toLowerCase()) { 
-                debt[thisOwner].eth += web3.utils.fromWei(txBalances[i].balance) * ethPrice
+            if(txBalances1[i].contract.toLowerCase() == aAaveAddress.toLowerCase()) {
+                collateral[thisOwner].aave += web3.utils.fromWei(txBalances1[i].balance) * aavePrice
+            } else if(txBalances1[i].contract.toLowerCase() == aAgeurAddress.toLowerCase()) {
+                collateral[thisOwner].ageur += web3.utils.fromWei(txBalances1[i].balance) * ageurPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aSushiAddress.toLowerCase()) {
+                collateral[thisOwner].sushi += web3.utils.fromWei(txBalances1[i].balance) * sushiPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aDaiAddress.toLowerCase()) {
+                collateral[thisOwner].dai += web3.utils.fromWei(txBalances1[i].balance) * daiPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aUsdtAddress.toLowerCase()) {
+                collateral[thisOwner].usdt += web3.utils.fromWei(txBalances1[i].balance) * usdtPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aLinkAddress.toLowerCase()) {
+                collateral[thisOwner].link += web3.utils.fromWei(txBalances1[i].balance) * linkPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aWmaticAddress.toLowerCase()) {
+                collateral[thisOwner].matic += web3.utils.fromWei(txBalances1[i].balance) * maticPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aUsdcAddress.toLowerCase()) {
+                collateral[thisOwner].usdc += web3.utils.fromWei(txBalances1[i].balance) * usdcPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aWbtcAddress.toLowerCase()) {
+                collateral[thisOwner].wbtc += (web3.utils.fromWei(txBalances1[i].balance, "gwei") * wbtcPrice * 10)
+            } else if(txBalances1[i].contract.toLowerCase() == aWethAddress.toLowerCase()) {
+                collateral[thisOwner].eth += web3.utils.fromWei(txBalances1[i].balance) * ethPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aAaveSDebtAddress.toLowerCase()) {
+                debt[thisOwner].aave += web3.utils.fromWei(txBalances1[i].balance) * aavePrice
+            } else if(txBalances1[i].contract.toLowerCase() == aAaveVDebtAddress.toLowerCase()) {
+                debt[thisOwner].aave += web3.utils.fromWei(txBalances1[i].balance) * aavePrice
+            } else if(txBalances1[i].contract.toLowerCase() == aAgeurSDebtAddress.toLowerCase()) {
+                debt[thisOwner].ageur += web3.utils.fromWei(txBalances1[i].balance) * ageurPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aAgeurVDebtAddress.toLowerCase()) { 
+                debt[thisOwner].ageur += web3.utils.fromWei(txBalances1[i].balance) * ageurPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aSushiSDebtAddress.toLowerCase()) {
+                debt[thisOwner].sushi += web3.utils.fromWei(txBalances1[i].balance) * sushiPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aSushiVDebtAddress.toLowerCase()) {
+                debt[thisOwner].sushi += web3.utils.fromWei(txBalances1[i].balance) * sushiPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aDaiSDebtAddress.toLowerCase()) { 
+                debt[thisOwner].dai += web3.utils.fromWei(txBalances1[i].balance) * daiPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aDaiVDebtAddress.toLowerCase()) { 
+                debt[thisOwner].dai += web3.utils.fromWei(txBalances1[i].balance) * daiPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aUsdtSDebtAddress.toLowerCase()) { 
+                debt[thisOwner].usdt += web3.utils.fromWei(txBalances1[i].balance) * usdtPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aUsdtVDebtAddress.toLowerCase()) { 
+                debt[thisOwner].usdt += web3.utils.fromWei(txBalances1[i].balance) * usdtPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aLinkSDebtAddress.toLowerCase()) { 
+                debt[thisOwner].link += web3.utils.fromWei(txBalances1[i].balance) * linkPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aLinkVDebtAddress.toLowerCase()) { 
+                debt[thisOwner].link += web3.utils.fromWei(txBalances1[i].balance) * linkPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aWmaticSDebtAddress.toLowerCase()) { 
+                debt[thisOwner].matic += web3.utils.fromWei(txBalances1[i].balance) * maticPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aWmaticVDebtAddress.toLowerCase()) { 
+                debt[thisOwner].matic += web3.utils.fromWei(txBalances1[i].balance) * maticPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aUsdcSDebtAddress.toLowerCase()) { 
+                debt[thisOwner].usdc += web3.utils.fromWei(txBalances1[i].balance) * usdcPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aUsdcVDebtAddress.toLowerCase()) {    
+                debt[thisOwner].usdc += web3.utils.fromWei(txBalances1[i].balance) * usdcPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aWbtcSDebtAddress.toLowerCase()) { 
+                debt[thisOwner].wbtc += (web3.utils.fromWei(txBalances1[i].balance, "gwei") * wbtcPrice * 10)
+            } else if(txBalances1[i].contract.toLowerCase() == aWbtcVDebtAddress.toLowerCase()) { 
+                debt[thisOwner].wbtc += (web3.utils.fromWei(txBalances1[i].balance, "gwei") * wbtcPrice * 10)
+            } else if(txBalances1[i].contract.toLowerCase() == aWethSDebtAddress.toLowerCase()) { 
+                debt[thisOwner].eth += web3.utils.fromWei(txBalances1[i].balance) * ethPrice
+            } else if(txBalances1[i].contract.toLowerCase() == aWethVDebtAddress.toLowerCase()) { 
+                debt[thisOwner].eth += web3.utils.fromWei(txBalances1[i].balance) * ethPrice
             } else { 
-                console.log("Unknown contract: {}", [txBalances[i].contract])
+                console.log("Unknown contract: {}", [txBalances1[i].contract])
             }
+        }
+    }
+    // for(let i=0; i<txBalances2.length; i++) {
+    for(let i=0; i<500; i++) {
+        thisOwner = txBalances2[i].owner.toLowerCase()
+        if(collateral[thisOwner] == undefined) {
+            // console.log("creating new collateral object")
+            collateral[thisOwner] = {}
+            collateral[thisOwner].aave = 0
+            collateral[thisOwner].ageur = 0
+            collateral[thisOwner].sushi = 0
+            collateral[thisOwner].dai = 0
+            collateral[thisOwner].usdt = 0
+            collateral[thisOwner].link = 0
+            collateral[thisOwner].matic = 0
+            collateral[thisOwner].usdc = 0
+            collateral[thisOwner].wbtc = 0
+            collateral[thisOwner].eth = 0
+            collateral[thisOwner].eurs = 0
+            collateral[thisOwner].jeur = 0
+            collateral[thisOwner].bal = 0
+            collateral[thisOwner].crv = 0
+            collateral[thisOwner].dpi = 0
+            collateral[thisOwner].ghst = 0
+            collateral[thisOwner].mimatic = 0
+            collateral[thisOwner].maticx = 0
+            collateral[thisOwner].stmatic = 0
+
+            debt[thisOwner] = {}
+            debt[thisOwner].aave = 0
+            debt[thisOwner].ageur = 0
+            debt[thisOwner].sushi = 0
+            debt[thisOwner].dai = 0
+            debt[thisOwner].usdt = 0
+            debt[thisOwner].link = 0
+            debt[thisOwner].matic = 0
+            debt[thisOwner].usdc = 0
+            debt[thisOwner].wbtc = 0
+            debt[thisOwner].eth = 0
+            debt[thisOwner].eurs = 0
+            debt[thisOwner].jeur = 0
+            debt[thisOwner].bal = 0
+            debt[thisOwner].crv = 0
+            debt[thisOwner].dpi = 0
+            debt[thisOwner].ghst = 0
+            debt[thisOwner].mimatic = 0
+            debt[thisOwner].maticx = 0
+            debt[thisOwner].stmatic = 0
+        }
+
+        if(txBalances2[i].contract.toLowerCase() == aEursAddress.toLowerCase()) {
+            collateral[thisOwner].eurs += web3.utils.fromWei(txBalances2[i].balance) * eursPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aJeurAddress.toLowerCase()) {
+            collateral[thisOwner].jeur += web3.utils.fromWei(txBalances2[i].balance) * jeurPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aBalAddress.toLowerCase()) {
+            collateral[thisOwner].bal += web3.utils.fromWei(txBalances2[i].balance) * balPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aCrvAddress.toLowerCase()) {
+            collateral[thisOwner].crv += web3.utils.fromWei(txBalances2[i].balance) * crvPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aDpiAddress.toLowerCase()) {
+            collateral[thisOwner].dpi += web3.utils.fromWei(txBalances2[i].balance) * dpiPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aGhstAddress.toLowerCase()) {
+            collateral[thisOwner].ghst += web3.utils.fromWei(txBalances2[i].balance) * ghstPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aMimaticAddress.toLowerCase()) {
+            collateral[thisOwner].mimatic += web3.utils.fromWei(txBalances2[i].balance) * mimaticPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aMaticxAddress.toLowerCase()) {
+            collateral[thisOwner].maticx += web3.utils.fromWei(txBalances2[i].balance) * maticxPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aStmaticAddress.toLowerCase()) {
+            collateral[thisOwner].stmatic += web3.utils.fromWei(txBalances2[i].balance) * stmaticPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aEursSDebtAddress.toLowerCase()) { 
+            debt[thisOwner].eurs += web3.utils.fromWei(txBalances2[i].balance) * eursPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aEursVDebtAddress.toLowerCase()) {
+            debt[thisOwner].eurs += web3.utils.fromWei(txBalances2[i].balance) * eursPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aJeurSDebtAddress.toLowerCase()) { 
+            debt[thisOwner].jeur += web3.utils.fromWei(txBalances2[i].balance) * jeurPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aJeurVDebtAddress.toLowerCase()) { 
+            debt[thisOwner].jeur += web3.utils.fromWei(txBalances2[i].balance) * jeurPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aBalSDebtAddress.toLowerCase()) { 
+            debt[thisOwner].bal += web3.utils.fromWei(txBalances2[i].balance) * balPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aBalVDebtAddress.toLowerCase()) { 
+            debt[thisOwner].bal += web3.utils.fromWei(txBalances2[i].balance) * balPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aCrvSDebtAddress.toLowerCase()) { 
+            debt[thisOwner].crv += web3.utils.fromWei(txBalances2[i].balance) * crvPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aCrvVDebtAddress.toLowerCase()) { 
+            debt[thisOwner].crv += web3.utils.fromWei(txBalances2[i].balance) * crvPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aDpiSDebtAddress.toLowerCase()) { 
+            debt[thisOwner].dpi += web3.utils.fromWei(txBalances2[i].balance) * dpiPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aDpiVDebtAddress.toLowerCase()) { 
+            debt[thisOwner].dpi += web3.utils.fromWei(txBalances2[i].balance) * dpiPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aGhstSDebtAddress.toLowerCase()) { 
+            debt[thisOwner].ghst += web3.utils.fromWei(txBalances2[i].balance) * ghstPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aGhstVDebtAddress.toLowerCase()) { 
+            debt[thisOwner].ghst += web3.utils.fromWei(txBalances2[i].balance) * ghstPrice
+        } else if(txBalances2[i].contract.toLowerCase() == aMimaticVDebtAddress.toLowerCase()) { 
+            debt[thisOwner].mimatic += web3.utils.fromWei(txBalances2[i].balance) * mimaticPrice
+        } else { 
+            console.log("Unknown contract: {}", [txBalances1[i].contract])
         }
     }
     console.log("Removing token contract balances from user balances...")
@@ -505,6 +592,94 @@ function parseBalances(txBalances) {
             delete collateral[aWethVDebtAddress]
             delete debt[aWethVDebtAddress]
         }
+        if(collateral[aEursAddress] != undefined) {
+            delete collateral[aEursAddress]
+            delete debt[aEursAddress] 
+        }
+        if(collateral[aEursSDebtAddress] != undefined) {
+            delete collateral[aEursSDebtAddress]
+            delete debt[aEursSDebtAddress]
+        }
+        if(collateral[aEursVDebtAddress] != undefined) {
+            delete collateral[aEursVDebtAddress]
+            delete debt[aEursVDebtAddress]
+        }
+        if(collateral[aJeurAddress] != undefined) {
+            delete collateral[aJeurAddress]
+            delete debt[aJeurAddress]
+        }
+        if(collateral[aJeurSDebtAddress] != undefined) {
+            delete collateral[aJeurSDebtAddress]
+            delete debt[aJeurSDebtAddress]
+        }
+        if(collateral[aJeurVDebtAddress] != undefined) {
+            delete collateral[aJeurVDebtAddress]
+            delete debt[aJeurVDebtAddress]
+        }
+        if(collateral[aBalAddress] != undefined) {
+            delete collateral[aBalAddress]
+            delete debt[aBalAddress]
+        }
+        if(collateral[aBalSDebtAddress] != undefined) {
+            delete collateral[aBalSDebtAddress]
+            delete debt[aBalSDebtAddress]
+        }
+        if(collateral[aBalVDebtAddress] != undefined) {
+            delete collateral[aBalVDebtAddress]
+            delete debt[aBalVDebtAddress]
+        }
+        if(collateral[aCrvAddress] != undefined) {
+            delete collateral[aCrvAddress]
+            delete debt[aCrvAddress]
+        }
+        if(collateral[aCrvSDebtAddress] != undefined) {
+            delete collateral[aCrvSDebtAddress]
+            delete debt[aCrvSDebtAddress]
+        }
+        if(collateral[aCrvVDebtAddress] != undefined) {
+            delete collateral[aCrvVDebtAddress]
+            delete debt[aCrvVDebtAddress]
+        }
+        if(collateral[aDpiAddress] != undefined) {
+            delete collateral[aDpiAddress]
+            delete debt[aDpiAddress]
+        }
+        if(collateral[aDpiSDebtAddress] != undefined) {
+            delete collateral[aDpiSDebtAddress]
+            delete debt[aDpiSDebtAddress]
+        }
+        if(collateral[aDpiVDebtAddress] != undefined) {
+            delete collateral[aDpiVDebtAddress]
+            delete debt[aDpiVDebtAddress]
+        }
+        if(collateral[aGhstAddress] != undefined) {
+            delete collateral[aGhstAddress]
+            delete debt[aGhstAddress]
+        }
+        if(collateral[aGhstSDebtAddress] != undefined) {
+            delete collateral[aGhstSDebtAddress]
+            delete debt[aGhstSDebtAddress]
+        }
+        if(collateral[aGhstVDebtAddress] != undefined) {
+            delete collateral[aGhstVDebtAddress]
+            delete debt[aGhstVDebtAddress]
+        }
+        if(collateral[aMimaticAddress] != undefined) {
+            delete collateral[aMimaticAddress]
+            delete debt[aMimaticAddress]
+        } 
+        if(collateral[aMimaticVDebtAddress] != undefined) {
+            delete collateral[aMimaticVDebtAddress]
+            delete debt[aMimaticVDebtAddress]
+        }
+        if(collateral[aMaticxAddress] != undefined) {
+            delete collateral[aMaticxAddress]
+            delete debt[aMaticxAddress]
+        }
+        if(collateral[aStmaticAddress] != undefined) {
+            delete collateral[aStmaticAddress]
+            delete debt[aStmaticAddress]
+        }
 
         console.log("Found " + Object.keys(collateral).length + " unique user addresses with balances")
 }
@@ -513,14 +688,13 @@ async function getToxicity2() {
     // get L^qP -- total $-value of assets owed by user q on platform P
     console.log("getting L^qP")
     for(i = 0; i < Object.keys(debt).length; i++) {
-        debt[Object.keys(debt)[i]].L = debt[Object.keys(debt)[i]].aave + debt[Object.keys(debt)[i]].ageur + debt[Object.keys(debt)[i]].sushi + debt[Object.keys(debt)[i]].dai + debt[Object.keys(debt)[i]].usdt + debt[Object.keys(debt)[i]].link + debt[Object.keys(debt)[i]].matic + debt[Object.keys(debt)[i]].usdc + debt[Object.keys(debt)[i]].wbtc + debt[Object.keys(debt)[i]].eth
-        // console.log(i)
+        debt[Object.keys(debt)[i]].L = debt[Object.keys(debt)[i]].aave + debt[Object.keys(debt)[i]].ageur + debt[Object.keys(debt)[i]].sushi + debt[Object.keys(debt)[i]].dai + debt[Object.keys(debt)[i]].usdt + debt[Object.keys(debt)[i]].link + debt[Object.keys(debt)[i]].matic + debt[Object.keys(debt)[i]].usdc + debt[Object.keys(debt)[i]].wbtc + debt[Object.keys(debt)[i]].eth + debt[Object.keys(debt)[i]].eurs + debt[Object.keys(debt)[i]].jeur + debt[Object.keys(debt)[i]].bal + debt[Object.keys(debt)[i]].crv + debt[Object.keys(debt)[i]].dpi + debt[Object.keys(debt)[i]].ghst + debt[Object.keys(debt)[i]].mimatic + debt[Object.keys(debt)[i]].maticx + debt[Object.keys(debt)[i]].stmatic
     }
 
     // get r_i^qP -- share of loans collateralized by asset i owned by user q on platform P
     console.log("getting r_i^qP")
     for(i = 0; i < Object.keys(collateral).length; i++) {
-        let denominator = aaveLtvAave * collateral[Object.keys(collateral)[i]].aave + ageurLtvAave * collateral[Object.keys(collateral)[i]].ageur + sushiLtvAave * collateral[Object.keys(collateral)[i]].sushi + daiLtvAave * collateral[Object.keys(collateral)[i]].dai + usdtLtvAave * collateral[Object.keys(collateral)[i]].usdt + linkLtvAave * collateral[Object.keys(collateral)[i]].link + maticLtvAave * collateral[Object.keys(collateral)[i]].matic + usdcLtvAave * collateral[Object.keys(collateral)[i]].usdc + wbtcLtvAave * collateral[Object.keys(collateral)[i]].wbtc + ethLtvAave * collateral[Object.keys(collateral)[i]].eth
+        let denominator = aaveLtvAave * collateral[Object.keys(collateral)[i]].aave + ageurLtvAave * collateral[Object.keys(collateral)[i]].ageur + sushiLtvAave * collateral[Object.keys(collateral)[i]].sushi + daiLtvAave * collateral[Object.keys(collateral)[i]].dai + usdtLtvAave * collateral[Object.keys(collateral)[i]].usdt + linkLtvAave * collateral[Object.keys(collateral)[i]].link + maticLtvAave * collateral[Object.keys(collateral)[i]].matic + usdcLtvAave * collateral[Object.keys(collateral)[i]].usdc + wbtcLtvAave * collateral[Object.keys(collateral)[i]].wbtc + ethLtvAave * collateral[Object.keys(collateral)[i]].eth + eursLtvAave * collateral[Object.keys(collateral)[i]].eurs + jeurLtvAave * collateral[Object.keys(collateral)[i]].jeur + balLtvAave * collateral[Object.keys(collateral)[i]].bal + crvLtvAave * collateral[Object.keys(collateral)[i]].crv + dpiLtvAave * collateral[Object.keys(collateral)[i]].dpi + ghstLtvAave * collateral[Object.keys(collateral)[i]].ghst + mimaticLtvAave * collateral[Object.keys(collateral)[i]].mimatic + maticxLtvAave * collateral[Object.keys(collateral)[i]].maticx + stmaticLtvAave * collateral[Object.keys(collateral)[i]].stmatic
         rAave = collateral[Object.keys(collateral)[i]].aave * aaveLtvAave / denominator
         rAgeur = collateral[Object.keys(collateral)[i]].ageur * ageurLtvAave / denominator
         rSushi = collateral[Object.keys(collateral)[i]].sushi * sushiLtvAave / denominator
@@ -531,6 +705,15 @@ async function getToxicity2() {
         rUsdc = collateral[Object.keys(collateral)[i]].usdc * usdcLtvAave / denominator
         rWbtc = collateral[Object.keys(collateral)[i]].wbtc * wbtcLtvAave / denominator
         rEth = collateral[Object.keys(collateral)[i]].eth * ethLtvAave / denominator
+        rEurs = collateral[Object.keys(collateral)[i]].eurs * eursLtvAave / denominator
+        rJeur = collateral[Object.keys(collateral)[i]].jeur * jeurLtvAave / denominator
+        rBal = collateral[Object.keys(collateral)[i]].bal * balLtvAave / denominator
+        rCrv = collateral[Object.keys(collateral)[i]].crv * crvLtvAave / denominator
+        rDpi = collateral[Object.keys(collateral)[i]].dpi * dpiLtvAave / denominator
+        rGhst = collateral[Object.keys(collateral)[i]].ghst * ghstLtvAave / denominator
+        rMimatic = collateral[Object.keys(collateral)[i]].mimatic * mimaticLtvAave / denominator
+        rMaticx = collateral[Object.keys(collateral)[i]].maticx * maticxLtvAave / denominator
+        rStmatic = collateral[Object.keys(collateral)[i]].stmatic * stmaticLtvAave / denominator
 
         if(isNaN(rAave)) {
             rAave = 0
@@ -562,12 +745,39 @@ async function getToxicity2() {
         if(isNaN(rEth)) {
             rEth = 0
         }
+        if(isNaN(rEurs)) {
+            rEurs = 0
+        }
+        if(isNaN(rJeur)) {
+            rJeur = 0
+        }
+        if(isNaN(rBal)) {
+            rBal = 0
+        }
+        if(isNaN(rCrv)) {
+            rCrv = 0
+        }
+        if(isNaN(rDpi)) {
+            rDpi = 0
+        }
+        if(isNaN(rGhst)) {
+            rGhst = 0
+        }
+        if(isNaN(rMimatic)) {
+            rMimatic = 0
+        }
+        if(isNaN(rMaticx)) {
+            rMaticx = 0
+        }
+        if(isNaN(rStmatic)) {
+            rStmatic = 0
+        }
         
-        rShare.push({address: Object.keys(collateral)[i], aave: rAave, ageur: rAgeur, sushi: rSushi, dai: rDai, usdt: rUsdt, link: rLink, matic: rMatic, usdc: rUsdc, wbtc: rWbtc, eth: rEth})
+        rShare.push({address: Object.keys(collateral)[i], aave: rAave, ageur: rAgeur, sushi: rSushi, dai: rDai, usdt: rUsdt, link: rLink, matic: rMatic, usdc: rUsdc, wbtc: rWbtc, eth: rEth, eurs: rEurs, jeur: rJeur, bal: rBal, crv: rCrv, dpi: rDpi, ghst: rGhst, mimatic: rMimatic, maticx: rMaticx, stmatic: rStmatic})
     }
 
     console.log("getting LByAsset")
-    LByAsset = {aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0}
+    LByAsset = {aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0}
     for(i = 0; i < Object.keys(collateral).length; i++) {
         LByAsset.aave += rShare[i].aave * debt[Object.keys(debt)[i]].L
         LByAsset.ageur += rShare[i].ageur * debt[Object.keys(debt)[i]].L
@@ -579,10 +789,19 @@ async function getToxicity2() {
         LByAsset.usdc += rShare[i].usdc * debt[Object.keys(debt)[i]].L
         LByAsset.wbtc += rShare[i].wbtc * debt[Object.keys(debt)[i]].L
         LByAsset.eth += rShare[i].eth * debt[Object.keys(debt)[i]].L
+        LByAsset.eurs += rShare[i].eurs * debt[Object.keys(debt)[i]].L
+        LByAsset.jeur += rShare[i].jeur * debt[Object.keys(debt)[i]].L
+        LByAsset.bal += rShare[i].bal * debt[Object.keys(debt)[i]].L
+        LByAsset.crv += rShare[i].crv * debt[Object.keys(debt)[i]].L
+        LByAsset.dpi += rShare[i].dpi * debt[Object.keys(debt)[i]].L
+        LByAsset.ghst += rShare[i].ghst * debt[Object.keys(debt)[i]].L
+        LByAsset.mimatic += rShare[i].mimatic * debt[Object.keys(debt)[i]].L
+        LByAsset.maticx += rShare[i].maticx * debt[Object.keys(debt)[i]].L
+        LByAsset.stmatic += rShare[i].stmatic * debt[Object.keys(debt)[i]].L
     }
 
     // get inc loan weighted average
-    incLoanWeightedAvg = {aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0}
+    incLoanWeightedAvg = {aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0}
     incLoanWeightedAvg.aave = aaveIncAave
     incLoanWeightedAvg.ageur = ageurIncAave
     incLoanWeightedAvg.sushi = sushiIncAave
@@ -593,9 +812,18 @@ async function getToxicity2() {
     incLoanWeightedAvg.usdc = usdcIncAave
     incLoanWeightedAvg.wbtc = wbtcIncAave
     incLoanWeightedAvg.eth = ethIncAave
+    incLoanWeightedAvg.eurs = eursIncAave
+    incLoanWeightedAvg.jeur = jeurIncAave
+    incLoanWeightedAvg.bal = balIncAave
+    incLoanWeightedAvg.crv = crvIncAave
+    incLoanWeightedAvg.dpi = dpiIncAave
+    incLoanWeightedAvg.ghst = ghstIncAave
+    incLoanWeightedAvg.mimatic = mimaticIncAave
+    incLoanWeightedAvg.maticx = maticxIncAave
+    incLoanWeightedAvg.stmatic = stmaticIncAave
 
     // get LTV loan weighted average
-    ltvLoanWeightedAvg = {aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0}
+    ltvLoanWeightedAvg = {aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0}
     ltvLoanWeightedAvg.aave = aaveLtvAave
     ltvLoanWeightedAvg.ageur = ageurLtvAave
     ltvLoanWeightedAvg.sushi = sushiLtvAave
@@ -606,21 +834,39 @@ async function getToxicity2() {
     ltvLoanWeightedAvg.usdc = usdcLtvAave
     ltvLoanWeightedAvg.wbtc = wbtcLtvAave
     ltvLoanWeightedAvg.eth = ethLtvAave
+    ltvLoanWeightedAvg.eurs = eursLtvAave
+    ltvLoanWeightedAvg.jeur = jeurLtvAave
+    ltvLoanWeightedAvg.bal = balLtvAave
+    ltvLoanWeightedAvg.crv = crvLtvAave
+    ltvLoanWeightedAvg.dpi = dpiLtvAave
+    ltvLoanWeightedAvg.ghst = ghstLtvAave
+    ltvLoanWeightedAvg.mimatic = mimaticLtvAave
+    ltvLoanWeightedAvg.maticx = maticxLtvAave
+    ltvLoanWeightedAvg.stmatic = stmaticLtvAave
 
     console.log("Getting cTotals")
     // get c_(i,j) total $-value of asset i collateralizing asset j loans 
-    cTotal.aaveCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.ageurCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.sushiCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.daiCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.usdtCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.linkCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.maticCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.usdcCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.wbtcCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    cTotal.ethCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0})
-    colStrings = ['aaveCollateral', 'ageurCollateral', 'sushiCollateral', 'daiCollateral', 'usdtCollateral', 'linkCollateral', 'maticCollateral', 'usdcCollateral', 'wbtcCollateral', 'ethCollateral']
-    debtStrings = ['aave', 'ageur', 'sushi', 'dai', 'usdt', 'link', 'matic', 'usdc', 'wbtc', 'eth']
+    cTotal.aaveCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.ageurCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.sushiCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.daiCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.usdtCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.linkCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.maticCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.usdcCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.wbtcCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.ethCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.eursCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.jeurCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.balCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.crvCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.dpiCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.ghstCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.mimaticCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.maticxCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    cTotal.stmaticCollateral = ({aave: 0, ageur: 0, sushi: 0, dai: 0, usdt: 0, link: 0, matic: 0, usdc: 0, wbtc: 0, eth: 0, eurs: 0, jeur: 0, bal: 0, crv: 0, dpi: 0, ghst: 0, mimatic: 0, maticx: 0, stmatic: 0})
+    colStrings = ['aaveCollateral', 'ageurCollateral', 'sushiCollateral', 'daiCollateral', 'usdtCollateral', 'linkCollateral', 'maticCollateral', 'usdcCollateral', 'wbtcCollateral', 'ethCollateral', 'eursCollateral', 'jeurCollateral', 'balCollateral', 'crvCollateral', 'dpiCollateral', 'ghstCollateral', 'mimaticCollateral', 'maticxCollateral', 'stmaticCollateral']
+    debtStrings = ['aave', 'ageur', 'sushi', 'dai', 'usdt', 'link', 'matic', 'usdc', 'wbtc', 'eth', 'eurs', 'jeur', 'bal', 'crv', 'dpi', 'ghst', 'mimatic', 'maticx', 'stmatic']
     for(i = 0; i < Object.keys(debt).length; i++) {
         for(j = 0; j < colStrings.length; j++) {
             for(k = 0; k < debtStrings.length; k++) {
