@@ -15,6 +15,7 @@ var erc20Abi = erc20Parsed.abi
 const COLLATERAL_ASSET = 'matic'
 const DEBT_ASSET = 'dai'
 
+const abiCoder = new ethers.utils.AbiCoder()
 const ONE_INCH_URL = "https://api.1inch.io/v4.0/137/quote?"
 const API_URL = "https://api.thegraph.com/subgraphs/name/tkernell/hundred-finance-polygon"
 const client = createClient({ url: API_URL });
@@ -642,10 +643,19 @@ async function getToxicity() {
         sOut = amountOut * debtPrice
         amountIn = amountIn + increment
     }
-
+    let toxicity = cTotal[cTotalCollateral][DEBT_ASSET] / ((colIn1 + colIn2) / 2)
+    console.log("toxicity0: " + toxicity)
     console.log("Collateral: " + COLLATERAL_ASSET)
     console.log("Debt: " + DEBT_ASSET)
-    console.log("toxicity: ", cTotal[cTotalCollateral][DEBT_ASSET] / ((colIn1 + colIn2) / 2))
+    console.log("toxicity1: ", cTotal[cTotalCollateral][DEBT_ASSET] / ((colIn1 + colIn2) / 2))
+
+    // get queryId, queryData
+    queryDataArgs = abiCoder.encode(["string", "string"], [COLLATERAL_ASSET, DEBT_ASSET])
+    queryData = abiCoder.encode(["string", "bytes"], ["LendingPairToxicity", queryDataArgs])
+    // keccak256 hash of queryData
+    queryId = web3.utils.keccak256(queryData)
+    console.log("queryId: " + queryId)
+    console.log("queryData: " + queryData)
 }
 
 function uniq(a) {
